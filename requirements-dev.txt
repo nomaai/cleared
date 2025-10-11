@@ -1,0 +1,9 @@
+mkdocs==1.6.0
+ipykernel==6.29.5
+jupyterlab==4.2.5
+ruff==0.5.1
+pytest==8.2.2
+pre-commit==3.7.1
+coverage==7.5.4
+pytest-cov==5.0.0
+gitchangelog==3.0.4
