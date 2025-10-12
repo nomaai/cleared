@@ -35,6 +35,7 @@ line-length = 88
 indent-width = 4
 
 [lint]
+preview = true
 select = [
     "A",  # prevent using keywords that clobber python builtins
     "B",  # bugbear: security warnings

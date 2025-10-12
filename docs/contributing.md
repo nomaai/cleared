@@ -1,5 +1,5 @@
-# Make command cheatsheet
 
+# Contributing
 ```bash
 ❯ make
 Usage: make <target>
