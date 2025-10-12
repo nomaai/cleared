@@ -55,12 +55,14 @@ jobs:
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
         run: |
-          task install
+          task setup-env
 
-      - name: Install dependencies (cached)
+      - name: Verify cached environment
         if: steps.cached-poetry-dependencies.outputs.cache-hit == 'true'
         run: |
-          task install
+          echo "Using cached virtual environment"
+          poetry env use python${{ matrix.python-version }}
+          poetry check
 
       - name: Show environment info
         run: task show
