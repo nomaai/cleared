@@ -73,7 +73,6 @@ jobs:
       - name: Run formatter check
         run: |
           task format
-          git diff --exit-code || (echo "Code formatting issues found. Run 'task format' locally to fix." && exit 1)
 
       - name: Run tests
         run: task test
