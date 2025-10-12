@@ -1,23 +1,30 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    # Ruff version.
-    rev: v0.5.1
-    hooks:
-      # Run the linter.
-      - id: ruff
-        stages: [pre-commit]
-        args: [--preview]
-      # Run the formatter.
-      - id: ruff-format
-        stages: [pre-commit]
-        args: [--preview]
   - repo: local
     hooks:
-    - id: pytest
-      name: pytest
-      entry: bash -c './scripts/run_pytest_ignore_error_5.sh'
-      language: system
-      types: [python]
-      pass_filenames: false
-      always_run: true
-      stages: [pre-push]
+      # Run linter using task command
+      - id: task-lint
+        name: task-lint
+        entry: task lint
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-commit]
+      
+      # Run formatter using task command
+      - id: task-format
+        name: task-format
+        entry: task format
+        language: system
+        types: [python]
+        pass_filenames: false
+        stages: [pre-commit]
+      
+      # Run tests using task command
+      - id: task-test
+        name: task-test
+        entry: task test
+        language: system
+        types: [python]
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]
