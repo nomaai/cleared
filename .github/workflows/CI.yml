@@ -1,3 +1,4 @@
+---
 # Robust CI/CD pipeline for cleared project using Task runner
 name: CI
 
@@ -5,9 +6,9 @@ name: CI
 on:
   # Triggers the workflow on push or pull request events but only for the main branch
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -20,7 +21,6 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

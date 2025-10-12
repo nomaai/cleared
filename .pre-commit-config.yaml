@@ -1,4 +1,29 @@
+---
 repos:
+  # GitHub Actions workflow linter
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.6.26
+    hooks:
+      - id: actionlint
+        name: actionlint
+        entry: actionlint
+        language: system
+        types: [yaml]
+        files: \.github/workflows/.*\.ya?ml$
+        stages: [pre-commit]
+
+  # YAML linter for all YAML files
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        name: yamllint
+        entry: yamllint
+        language: system
+        types: [yaml]
+        args: [-c=.yamllint]
+        stages: [pre-commit]
+
   - repo: local
     hooks:
       # Run linter using task command
@@ -9,7 +34,7 @@ repos:
         types: [python]
         pass_filenames: false
         stages: [pre-commit]
-      
+
       # Run formatter using task command
       - id: task-format
         name: task-format
@@ -18,7 +43,7 @@ repos:
         types: [python]
         pass_filenames: false
         stages: [pre-commit]
-      
+
       # Run tests using task command
       - id: task-test
         name: task-test

@@ -210,6 +210,114 @@ install_pre_commit() {
   esac
 }
 
+# Function to check and install actionlint
+check_actionlint() {
+  if ! command -v actionlint >/dev/null 2>&1; then
+    echo "❌ Error: actionlint is not installed!"
+    echo ""
+    echo "Do you want me to go ahead and install actionlint? (y/n)"
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+      echo "Installing actionlint..."
+      install_actionlint
+      return $?
+    else
+      echo "No worries! You can install actionlint manually:"
+      echo "  macOS: brew install actionlint"
+      echo "  Ubuntu: Download from https://github.com/rhysd/actionlint/releases"
+      return 1
+    fi
+  fi
+  return 0
+}
+
+# Function to install actionlint based on OS
+install_actionlint() {
+  OS="$(uname -s)"
+  case "$OS" in
+    Linux)
+      if command -v curl >/dev/null 2>&1; then
+        curl -sL https://github.com/rhysd/actionlint/releases/latest/download/actionlint_linux_amd64.tar.gz | tar -xz
+        sudo mv actionlint /usr/local/bin/
+        echo "✅ actionlint installed via direct download."
+      else
+        echo "❌ Cannot install actionlint. Please install curl or install manually."
+        return 1
+      fi
+      ;;
+    Darwin)
+      if command -v brew >/dev/null 2>&1; then
+        brew install actionlint
+        echo "✅ actionlint installed via Homebrew."
+      else
+        echo "❌ Cannot install actionlint. Please install Homebrew or install manually."
+        return 1
+      fi
+      ;;
+    *)
+      echo "❌ Unsupported operating system: $OS"
+      return 1
+      ;;
+  esac
+}
+
+# Function to check and install yamllint
+check_yamllint() {
+  if ! command -v yamllint >/dev/null 2>&1; then
+    echo "❌ Error: yamllint is not installed!"
+    echo ""
+    echo "Do you want me to go ahead and install yamllint? (y/n)"
+    read -r response
+    if [[ "$response" =~ ^[Yy]$ ]]; then
+      echo "Installing yamllint..."
+      install_yamllint
+      return $?
+    else
+      echo "No worries! You can install yamllint manually:"
+      echo "  macOS: brew install yamllint"
+      echo "  Ubuntu: sudo apt install yamllint"
+      echo "  Or via pip: pip install yamllint"
+      return 1
+    fi
+  fi
+  return 0
+}
+
+# Function to install yamllint based on OS
+install_yamllint() {
+  OS="$(uname -s)"
+  case "$OS" in
+    Linux)
+      if command -v apt >/dev/null 2>&1; then
+        sudo apt update && sudo apt install -y yamllint
+        echo "✅ yamllint installed via apt."
+      elif command -v pip3 >/dev/null 2>&1; then
+        pip3 install yamllint
+        echo "✅ yamllint installed via pip3."
+      else
+        echo "❌ Cannot install yamllint. Please install apt or pip3."
+        return 1
+      fi
+      ;;
+    Darwin)
+      if command -v brew >/dev/null 2>&1; then
+        brew install yamllint
+        echo "✅ yamllint installed via Homebrew."
+      elif command -v pip3 >/dev/null 2>&1; then
+        pip3 install yamllint
+        echo "✅ yamllint installed via pip3."
+      else
+        echo "❌ Cannot install yamllint. Please install Homebrew or pip3."
+        return 1
+      fi
+      ;;
+    *)
+      echo "❌ Unsupported operating system: $OS"
+      return 1
+      ;;
+  esac
+}
+
 # Check Poetry
 if ! check_poetry; then
   exit 1
@@ -217,6 +325,16 @@ fi
 
 # Check pre-commit
 if ! check_pre_commit; then
+  exit 1
+fi
+
+# Check actionlint
+if ! check_actionlint; then
+  exit 1
+fi
+
+# Check yamllint
+if ! check_yamllint; then
   exit 1
 fi
 

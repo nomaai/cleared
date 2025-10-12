@@ -1,5 +1,6 @@
+---
 # Cleared - Data De-identification Framework
-# 
+#
 # This Taskfile provides commands for:
 # - Environment setup and dependency management
 # - Code quality (linting, formatting, testing)
@@ -33,7 +34,9 @@ vars:
 tasks:
 
   show:
-    desc: "Display current Python environment info, Poetry config, and Python version. Useful for debugging environment issues."
+    desc: >
+      Display current Python environment info, Poetry config, and Python version.
+      Useful for debugging environment issues.
     cmds:
       - task: verify-deps
       - echo 'Current environment:'
@@ -41,12 +44,16 @@ tasks:
       - poetry run python -V
 
   install-os-deps:
-    desc: "Install OS dependencies (Poetry and pre-commit) for Ubuntu and macOS. Run this FIRST if you don't have Poetry installed. Supports interactive installation."
+    desc: >
+      Install OS dependencies (Poetry and pre-commit) for Ubuntu and macOS.
+      Run this FIRST if you don't have Poetry installed. Supports interactive installation.
     cmds:
       - ./scripts/install_os_deps.sh
 
   install:
-    desc: "Install only build dependencies (without dev dependencies). Use this for production deployments. Depends on verify-deps."
+    desc: >
+      Install only build dependencies (without dev dependencies).
+      Use this for production deployments. Depends on verify-deps.
     cmds:
       - task: verify-deps
       - echo 'Installing build dependencies...'
@@ -54,7 +61,10 @@ tasks:
       - echo 'Build dependencies installed!'
 
   setup-env:
-    desc: "Setup complete Python development environment with Poetry. Installs all dependencies and configures pre-commit hooks. Run this after install-os-deps."
+    desc: >
+      Setup complete Python development environment with Poetry.
+      Installs all dependencies and configures pre-commit hooks.
+      Run this after install-os-deps.
     cmds:
       - task: verify-deps
       - echo 'Setting up Python environment with Poetry...'
@@ -65,61 +75,85 @@ tasks:
       - echo 'You can now run task show'
 
   verify-deps:
-    desc: "Verify required dependencies are installed (private task). Checks for Poetry, pre-commit, fswatch, and taskfile. Used by other tasks."
+    desc: >
+      Verify required dependencies are installed (private task).
+      Checks for Poetry, pre-commit, fswatch, and taskfile. Used by other tasks.
     internal: true
     cmds:
       - ./scripts/verify_deps.sh
 
   verify-env:
-    desc: "Verify if setup-env has been executed and environment is ready. Checks Python env, cleared package, pre-commit, and git hooks. Use this to debug environment issues."
+    desc: >
+      Verify if setup-env has been executed and environment is ready.
+      Checks Python env, cleared package, pre-commit, and git hooks.
+      Use this to debug environment issues.
     cmds:
       - ./scripts/verify_env.sh
 
   verify-env-silent:
-    desc: "Verify environment silently (internal task). Same as verify-env but with no output. Used by other tasks for dependency checking."
+    desc: >
+      Verify environment silently (internal task).
+      Same as verify-env but with no output. Used by other tasks for dependency checking.
     internal: true
     cmds:
       - ./scripts/verify_env.sh silent
 
   help:
-    desc: "Show all available tasks with descriptions. Use this to discover what commands are available."
+    desc: >
+      Show all available tasks with descriptions.
+      Use this to discover what commands are available.
     cmds:
       - task --list
   
   lint:
-    desc: "Run code linter using ruff. Checks for code quality issues, style violations, and potential bugs. Run this before committing code."
+    desc: >
+      Run code linter using ruff. Checks for code quality issues, style violations, and potential bugs.
+      Run this before committing code.
     cmds:
       - poetry run ruff check
 
   lint-fix:
-    desc: "Auto-fix linting issues using ruff. Automatically corrects many code style and quality issues. Run this after lint to fix auto-fixable issues."
+    desc: >
+      Auto-fix linting issues using ruff. Automatically corrects many code style and quality issues.
+      Run this after lint to fix auto-fixable issues.
     cmds:
       - poetry run ruff check --fix
 
   format:
-    desc: "Format code using ruff (black-like style). Ensures consistent code formatting across the project. Run this before committing code."
+    desc: >
+      Format code using ruff (black-like style). Ensures consistent code formatting across the project.
+      Run this before committing code.
     cmds:
       - poetry run ruff format
 
   test:
-    desc: "Run all tests using pytest with coverage reporting. Executes the full test suite and generates coverage reports. Essential before deploying."
+    desc: >
+      Run all tests using pytest with coverage reporting.
+      Executes the full test suite and generates coverage reports. Essential before deploying.
     cmds:
       - poetry run pytest
 
   docs:
-    desc: "Build and open project documentation using MkDocs. Generates HTML documentation and opens it in your default browser."
+    desc: >
+      Build and open project documentation using MkDocs.
+      Generates HTML documentation and opens it in your default browser.
     cmds:
       - echo 'building documentation ...'
       - poetry run mkdocs build
       - URL="site/index.html"; xdg-open $URL || sensible-browser $URL || x-www-browser $URL || gnome-open $URL || open $URL
 
   clean:
-    desc: "Clean build artifacts, cache files, and temporary files. Removes .pyc files, __pycache__, build directories, and Poetry cache. Safe to run anytime."
+    desc: >
+      Clean build artifacts, cache files, and temporary files.
+      Removes .pyc files, __pycache__, build directories, and Poetry cache.
+      Safe to run anytime.
     cmds:
       - ./scripts/clean.sh
 
   install-jupyter:
-    desc: "Install Jupyter kernel for the cleared project. Sets up a custom kernel named 'cleared' for use in Jupyter notebooks. One-time setup."
+    desc: >
+      Install Jupyter kernel for the cleared project.
+      Sets up a custom kernel named 'cleared' for use in Jupyter notebooks. One-time setup.
     cmds:
       - poetry run python -m ipykernel install --user --name "cleared" --display-name "Cleared"
       - echo 'Jupyter kernel installed successfully!'
@@ -127,11 +161,17 @@ tasks:
       - echo 'To set a password, run poetry run jupyter server password'
 
   run-jupyter:
-    desc: "Start Jupyter Lab server for remote access. Configures and starts Jupyter with remote access capabilities. Requires password setup first."
+    desc: >
+      Start Jupyter Lab server for remote access.
+      Configures and starts Jupyter with remote access capabilities. Requires password setup first.
     cmds:
       - . scripts/run_jupyter_remote.sh
 
   watch:
-    desc: "Watch Python files for changes and auto-run lint, format, test. Monitors .py files and runs quality checks automatically. Press Ctrl+C to stop."
+    desc: >
+      Watch Python files for changes and auto-run lint, format, test.
+      Monitors .py files and runs quality checks automatically. Press Ctrl+C to stop.
     cmds:
+      - task: verify-deps
+      - task: verify-env-silent
       - ./scripts/watch.sh
