@@ -160,6 +160,33 @@ install_yamllint() {
     fi
 }
 
+# Function to install fswatch
+install_fswatch() {
+    echo "🔧 Installing fswatch..."
+    if command -v fswatch >/dev/null 2>&1; then
+        echo "✅ fswatch is already installed"
+    elif [[ "$OS" == "Linux" ]]; then
+        if command -v apt >/dev/null 2>&1; then
+            sudo apt update && sudo apt install -y fswatch
+            echo "✅ fswatch installed via apt."
+        else
+            echo "❌ Cannot install fswatch. Please install apt or install manually."
+            exit 1
+        fi
+    elif [[ "$OS" == "Darwin" ]]; then
+        if command -v brew >/dev/null 2>&1; then
+            brew install fswatch
+            echo "✅ fswatch installed via Homebrew."
+        else
+            echo "❌ Cannot install fswatch. Please install Homebrew or install manually."
+            exit 1
+        fi
+    else
+        echo "❌ Cannot install fswatch. Please install manually."
+        exit 1
+    fi
+}
+
 echo "📋 Detected OS: $(echo "$OS" | tr '[:upper:]' '[:lower:]')"
 
 case "$OS" in
@@ -168,12 +195,14 @@ case "$OS" in
         install_pre_commit
         install_actionlint
         install_yamllint
+        install_fswatch
         ;;
     Darwin)
         install_poetry
         install_pre_commit
         install_actionlint
         install_yamllint
+        install_fswatch
         ;;
     *)
         echo "❌ Unsupported operating system: $OS"
