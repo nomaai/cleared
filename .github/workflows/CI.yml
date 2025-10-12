@@ -78,4 +78,6 @@ jobs:
         run: task test
 
       - name: Build documentation
+        env:
+          CI: true
         run: task docs

@@ -136,11 +136,17 @@ tasks:
   docs:
     desc: >
       Build and open project documentation using MkDocs.
-      Generates HTML documentation and opens it in your default browser.
+      Generates HTML documentation and opens it in your default browser (skips opening in CI).
     cmds:
       - echo 'building documentation ...'
       - poetry run mkdocs build
-      - URL="site/index.html"; xdg-open $URL || sensible-browser $URL || x-www-browser $URL || gnome-open $URL || open $URL
+      - |
+        if [ -z "$CI" ]; then
+          URL="site/index.html"
+          xdg-open $URL || sensible-browser $URL || x-www-browser $URL || gnome-open $URL || open $URL
+        else
+          echo "Documentation built successfully at site/index.html (CI environment detected, skipping browser opening)"
+        fi
 
   clean:
     desc: >

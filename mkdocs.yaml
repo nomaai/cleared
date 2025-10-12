@@ -1,3 +1,44 @@
 ---
 site_name: cleared
-theme: readthedocs
+site_description: A data de-identification framework for python
+site_author: NOMA AI INC.
+site_url: https://github.com/nomaai/cleared
+
+# Navigation
+nav:
+  - Overview: index.md
+  - Quickstart: quickstart.md
+  - Multi-table De-identification: multi-table-deidentification.md
+  - Group-level ID de-identification: group-level-id-deidentification.md
+  - Date and Time Shifting: date-and-time-shifting.md
+  - Free-text PHI Detection: phi-detection.md
+  - Logging and Auditing: logging-and-auditing.md
+  - Healthcare Schema Support: healthcare-schema-support.md
+  - Custom Transformers Plugins: custom-transformers-plugins.md
+  - Contributing: contributing.md
+
+# Theme configuration
+theme:
+  name: readthedocs
+  logo: logo-small.png
+  favicon: favicon.png
+  include_search_page: true
+  search_index_only: true
+
+# Plugins
+plugins:
+  - search
+
+# Markdown extensions
+markdown_extensions:
+  - toc:
+      permalink: true
+  - tables
+  - fenced_code
+  - codehilite
+  - attr_list
+  - md_in_html
+
+# Extra configuration
+extra:
+  version: 0.1.0
