@@ -79,18 +79,46 @@ install_actionlint() {
     else
         if [[ "$OS" == "Linux" ]]; then
             # Download and install actionlint for Linux
-            curl -sL https://github.com/rhysd/actionlint/releases/latest/download/actionlint_linux_amd64.tar.gz | tar -xz
-            sudo mv actionlint /usr/local/bin/
-            echo "✅ actionlint installed via direct download."
+            # Use a more robust approach for CI environments
+            LATEST_URL=$(curl -s https://api.github.com/repos/rhysd/actionlint/releases/latest | grep "browser_download_url.*linux_amd64.tar.gz" | cut -d '"' -f 4)
+            if [ -n "$LATEST_URL" ]; then
+                echo "📥 Downloading actionlint from: $LATEST_URL"
+                # Download to a temporary file first to avoid pipe issues
+                TEMP_FILE=$(mktemp)
+                if curl -sL "$LATEST_URL" -o "$TEMP_FILE"; then
+                    echo "📦 Extracting actionlint..."
+                    if tar -xzf "$TEMP_FILE" && rm "$TEMP_FILE"; then
+                        sudo mv actionlint /usr/local/bin/
+                        echo "✅ actionlint installed via direct download."
+                    else
+                        echo "❌ Failed to extract actionlint archive."
+                        rm -f "$TEMP_FILE"
+                        return 1
+                    fi
+                else
+                    echo "❌ Failed to download actionlint from $LATEST_URL"
+                    rm -f "$TEMP_FILE"
+                    return 1
+                fi
+            else
+                echo "❌ Failed to get actionlint download URL."
+                return 1
+            fi
         elif [[ "$OS" == "Darwin" ]]; then
             if command -v brew >/dev/null 2>&1; then
                 brew install actionlint
                 echo "✅ actionlint installed via Homebrew."
             else
                 # Download and install actionlint for macOS
-                curl -sL https://github.com/rhysd/actionlint/releases/latest/download/actionlint_darwin_amd64.tar.gz | tar -xz
-                sudo mv actionlint /usr/local/bin/
-                echo "✅ actionlint installed via direct download."
+                LATEST_URL=$(curl -s https://api.github.com/repos/rhysd/actionlint/releases/latest | grep "browser_download_url.*darwin_amd64.tar.gz" | cut -d '"' -f 4)
+                if [ -n "$LATEST_URL" ]; then
+                    curl -sL "$LATEST_URL" | tar -xz
+                    sudo mv actionlint /usr/local/bin/
+                    echo "✅ actionlint installed via direct download."
+                else
+                    echo "❌ Failed to get actionlint download URL."
+                    return 1
+                fi
             fi
         else
             echo "❌ Cannot install actionlint. Please install manually from https://github.com/rhysd/actionlint"
