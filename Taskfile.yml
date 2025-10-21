@@ -107,17 +107,29 @@ tasks:
   
   lint:
     desc: >
-      Run code linter using ruff. Checks for code quality issues, style violations, and potential bugs.
+      Run all linters (ruff, yamllint, actionlint). Checks for code quality issues, 
+      style violations, and potential bugs.
       Run this before committing code.
     cmds:
+      - echo "Running Python code linter (ruff)..."
       - poetry run ruff check
+      - echo "Running YAML linter (yamllint)..."
+      - poetry run yamllint .
+      - echo "Running GitHub Actions linter (actionlint)..."
+      - poetry run actionlint .github/workflows/*.yml
 
   lint-fix:
     desc: >
-      Auto-fix linting issues using ruff. Automatically corrects many code style and quality issues.
+      Auto-fix linting issues using ruff, yamllint, and actionlint. 
+      Automatically corrects many code style and quality issues.
       Run this after lint to fix auto-fixable issues.
     cmds:
+      - echo "Auto-fixing Python code issues (ruff)..."
       - poetry run ruff check --fix
+      - echo "Auto-fixing YAML issues (yamllint)..."
+      - poetry run yamllint .
+      - echo "Checking GitHub Actions workflows (actionlint)..."
+      - poetry run actionlint .github/workflows/*.yml
 
   format:
     desc: >

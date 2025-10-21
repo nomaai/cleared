@@ -1,0 +1,59 @@
+# Example configuration for FileSystemDataLoader using new IOConfig structure
+io_type: filesystem
+suffix: "_deid"
+configs:
+  base_path: "./data"
+  file_format: "csv"
+  encoding: "utf-8"
+  separator: ","
+  table_mappings:
+    patients: patients_deid
+    encounters: encounters_deid
+    observations: observations_deid
+  validation_rules:
+    patients:
+      required_columns: ["patient_id", "age", "gender"]
+      expected_types:
+        patient_id: "int64"
+        age: "int64"
+        gender: "object"
+    encounters:
+      required_columns: ["encounter_id", "patient_id", "admission_date"]
+      expected_types:
+        encounter_id: "int64"
+        patient_id: "int64"
+        admission_date: "datetime64[ns]"
+
+---
+# Example configuration for SQLDataLoader using new IOConfig structure
+io_type: sql
+suffix: "_deid"
+configs:
+  database_url: "postgresql://user:password@localhost:5432/healthcare_db"
+  # Alternative individual parameters:
+  # driver: "postgresql"
+  # host: "localhost"
+  # port: 5432
+  # username: "user"
+  # password: "password"
+  # database: "healthcare_db"
+  echo: false
+  pool_pre_ping: true
+  pool_recycle: 3600
+  table_mappings:
+    patients: patients_deid
+    encounters: encounters_deid
+    observations: observations_deid
+  validation_rules:
+    patients:
+      required_columns: ["patient_id", "age", "gender"]
+      expected_types:
+        patient_id: "int64"
+        age: "int64"
+        gender: "object"
+    encounters:
+      required_columns: ["encounter_id", "patient_id", "admission_date"]
+      expected_types:
+        encounter_id: "int64"
+        patient_id: "int64"
+        admission_date: "datetime64[ns]"

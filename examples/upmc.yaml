@@ -1,0 +1,118 @@
+# Example configuration for TablePipeline using new ClearedConfig structure
+deid_config:
+  time_shift:
+    method: "random_months"
+    min: -60
+    max: 60
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./data/input"
+        file_format: "csv"
+        encoding: "utf-8"
+        separator: ","
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./data/output"
+        file_format: "csv"
+        encoding: "utf-8"
+        separator: ","
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./data/references/v0/"
+        file_format: "csv"
+        encoding: "utf-8"
+        separator: ","
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./data/references/v1/"
+        file_format: "csv"
+        encoding: "utf-8"
+        separator: ","
+tables:
+  encounters:
+    name: "encounters"
+    depends_on: []
+    transformers:
+
+      - method: "IDDeidentifier"
+        uid: "eid_deid"
+        configs:
+          idconfig:
+            name: "MOM_ENCNTR_ID"
+            uid: "encounter_id"
+
+      - method: "IDDeidentifier"
+        uid: "pid_deid"
+        configs:
+          idconfig:
+            name: "MOM_PERSON_ID"
+            uid: "person_id"
+
+      - method: "DateTimeDeidentifier"
+        uid: "admit_deid"
+        depends_on: ["pid_deid"]
+        configs:
+          idconfig:
+            name: "DELIVERY_ADMITDATE"
+            uid: "admit_date"
+
+      - method: "DateTimeDeidentifier"
+        uid: "reg_deid"
+        depends_on: ["pid_deid"]
+        configs:
+          idconfig:
+            name: "REG_DT_TM"
+            uid: "reg_date"
+
+      - method: "DateTimeDeidentifier"
+        uid: "del_deid"
+        depends_on: ["pid_deid"]
+        configs:
+          idconfig:
+            name: "DELIVERY_DT_TM"
+            uid: "del_date"
+
+      - method: "DateTimeDeidentifier"
+        uid: "disch_deid"
+        depends_on: ["pid_deid"]
+        configs:
+          idconfig:
+            name: "DELIVERY_DISCHDATE"
+            uid: "disch_date" 
+  
+  
+  med_admins:
+    name: "med_admins"
+    depends_on: []
+    transformers:
+
+      - method: "IDDeidentifier"
+        uid: "eid_deid"
+        configs:
+          idconfig:
+            name: "MOM_ENCNTR_ID"
+            uid: "encounter_id"
+
+      - method: "IDDeidentifier"
+        uid: "pid_deid"
+        configs:
+          idconfig:
+            name: "MOM_PERSON_ID"
+            uid: "person_id"
+
+      - method: "DateTimeDeidentifier"
+        uid: "admin_start"
+        depends_on: ["pid_deid"]
+        configs:
+          idconfig:
+            name: "ADMIN_START_DT_TM"
+            uid: "person_id"
+
+    

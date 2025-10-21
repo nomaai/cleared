@@ -1,0 +1,20 @@
+# Actionlint configuration for GitHub Actions workflow linting
+# This file configures actionlint to check GitHub Actions workflow files
+
+# Enable all checks by default
+on-failure: error
+
+# Allow some common patterns
+ignore:
+  # Allow some common workflow patterns
+  - "action/uses-version"
+  - "action/uses-version-pinned"
+
+# Set shellcheck path if available
+shellcheck: shellcheck
+
+# Set pyflakes path if available  
+pyflakes: pyflakes
+
+# Enable verbose output
+verbose: true

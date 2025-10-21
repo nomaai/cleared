@@ -1,0 +1,92 @@
+# Default Cleared Configuration Template
+# This is a template configuration file for the Cleared data de-identification framework
+
+# @package _global_
+defaults:
+  - cleared_config
+
+# Engine name
+name: "cleared_engine"
+
+# De-identification configuration
+deid_config:
+  global_uids:
+    patient_id:
+      name: "patient_id"
+      uid: "patient_id"
+      description: "Patient identifier"
+    encounter_id:
+      name: "encounter_id"
+      uid: "encounter_id"
+      description: "Encounter identifier"
+  
+  time_shift:
+    method: "random_days"
+    ref_id: "patient_id"
+    min: -365
+    max: 365
+
+# I/O configuration
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "/tmp/input"
+        file_format: "csv"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "/tmp/output"
+        file_format: "csv"
+  
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "/tmp/deid_ref_input"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "/tmp/deid_ref_output"
+  
+  runtime_io_path: "/tmp/runtime"
+
+# Table configurations
+tables:
+  patients:
+    name: "patients"
+    depends_on: []
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "patient_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "patient_id"
+            uid: "patient_id"
+            description: "Patient identifier"
+  
+  encounters:
+    name: "encounters"
+    depends_on: ["patients"]
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "encounter_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "encounter_id"
+            uid: "encounter_id"
+            description: "Encounter identifier"
+      
+      - method: "DateTimeDeidentifier"
+        uid: "admission_date_transformer"
+        depends_on: ["encounter_id_transformer"]
+        configs:
+          idconfig:
+            name: "patient_id"
+            uid: "patient_id"
+            description: "Patient identifier for time shifting"
+          time_shift_method: "random_days"
+          datetime_column: "admission_date"

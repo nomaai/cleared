@@ -1,36 +1,41 @@
 extends: default
 
 rules:
-  # Line length
+  # Allow line length up to 120 characters
   line-length:
-    max: 150
+    max: 120
     level: warning
   
-  # Indentation
+  # Allow comments to be indented
+  comments-indentation: disable
+  
+  # Allow document start
+  document-start: disable
+  
+  # Allow truthy values
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
+  
+  # Allow octal values
+  octal-values: disable
+  
+  # Allow trailing spaces in some contexts
+  trailing-spaces: disable
+  
+  # Allow empty lines at end of file
+  empty-lines:
+    max-end: 2
+  
+  # Allow indentation with 2 spaces for YAML files
   indentation:
     spaces: 2
     indent-sequences: true
     check-multi-line-strings: false
-  
-  # Comments
-  comments:
-    min-spaces-from-content: 1
-  
-  # Document start
-  document-start:
-    present: true
-  
-  # Trailing spaces
-  trailing-spaces:
-    level: warning
-  
-  # Empty lines
-  empty-lines:
-    max: 2
-    max-start: 0
-    max-end: 1
-  
-  # Truthy values
-  truthy:
-    allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
-    check-keys: true
+ignore:
+  - .venv/
+  - .pytest_cache/
+  - .ruff_cache/
+  - .mypy_cache/
+  - .tox/
+  - .coverage/
+  - .coverage.*

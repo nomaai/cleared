@@ -1,0 +1,40 @@
+# @package _global_
+defaults:
+  - _self_
+
+# Engine name
+name: "cleared_engine"
+
+# De-identification configuration
+deid_config:
+  global_uids: {}
+  time_shift: null
+
+# I/O configuration
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "/tmp/input"
+        file_format: "csv"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "/tmp/output"
+        file_format: "csv"
+  
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "/tmp/deid_ref_input"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "/tmp/deid_ref_output"
+  
+  runtime_io_path: "/tmp/runtime"
+
+# Table configurations
+tables: {}

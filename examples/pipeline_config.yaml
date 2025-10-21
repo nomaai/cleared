@@ -1,0 +1,190 @@
+# Example configuration for TablePipeline using new ClearedConfig structure
+deid_config:
+  global_uids:
+    patient_id:
+      name: "patient_id"
+      uid: "patient_id"
+      description: "Unique patient identifier"
+  time_shift:
+    method: "random_days"
+    ref_id: "patient_id"
+    min: -365
+    max: 365
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./data"
+        file_format: "csv"
+        encoding: "utf-8"
+        separator: ","
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./data"
+        file_format: "csv"
+        encoding: "utf-8"
+        separator: ","
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./data"
+        file_format: "csv"
+        encoding: "utf-8"
+        separator: ","
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./data"
+        file_format: "csv"
+        encoding: "utf-8"
+        separator: ","
+tables:
+  patients:
+    name: "patients"
+    depends_on: []
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "id_deidentifier"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "patient_id"
+            uid: "patient_id"
+            description: "Unique patient identifier"
+      - method: "DateTimeDeidentifier"
+        uid: "date_deidentifier"
+        depends_on: ["id_deidentifier"]
+        configs:
+          idconfig:
+            name: "patient_id"
+            uid: "patient_id"
+            description: "Unique patient identifier"
+          time_shift_method: "random_days"
+          datetime_column: "admission_date"
+
+---
+# Example configuration for GlobalPipeline using new ClearedConfig structure
+deid_config:
+  global_uids:
+    patient_id:
+      name: "patient_id"
+      uid: "patient_id"
+      description: "Unique patient identifier"
+  time_shift:
+    method: "random_days"
+    ref_id: "patient_id"
+    min: -365
+    max: 365
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./data"
+        file_format: "csv"
+        encoding: "utf-8"
+        separator: ","
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./data"
+        file_format: "csv"
+        encoding: "utf-8"
+        separator: ","
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./data"
+        file_format: "csv"
+        encoding: "utf-8"
+        separator: ","
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./data"
+        file_format: "csv"
+        encoding: "utf-8"
+        separator: ","
+tables:
+  patients:
+    name: "patients"
+    depends_on: []
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "id_deidentifier"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "patient_id"
+            uid: "patient_id"
+            description: "Unique patient identifier"
+      - method: "DateTimeDeidentifier"
+        uid: "date_deidentifier"
+        depends_on: ["id_deidentifier"]
+        configs:
+          idconfig:
+            name: "patient_id"
+            uid: "patient_id"
+            description: "Unique patient identifier"
+          time_shift_method: "random_days"
+          datetime_column: "admission_date"
+
+---
+# Example configuration for SQL-based GlobalPipeline using new ClearedConfig structure
+deid_config:
+  global_uids:
+    patient_id:
+      name: "patient_id"
+      uid: "patient_id"
+      description: "Unique patient identifier"
+  time_shift:
+    method: "random_days"
+    ref_id: "patient_id"
+    min: -365
+    max: 365
+io:
+  data:
+    input_config:
+      io_type: "sql"
+      configs:
+        database_url: "postgresql://user:password@localhost:5432/healthcare_db"
+    output_config:
+      io_type: "sql"
+      configs:
+        database_url: "postgresql://user:password@localhost:5432/healthcare_db"
+  deid_ref:
+    input_config:
+      io_type: "sql"
+      configs:
+        database_url: "postgresql://user:password@localhost:5432/healthcare_db"
+    output_config:
+      io_type: "sql"
+      configs:
+        database_url: "postgresql://user:password@localhost:5432/healthcare_db"
+tables:
+  patients:
+    name: "patients"
+    depends_on: []
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "id_deidentifier"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "patient_id"
+            uid: "patient_id"
+            description: "Unique patient identifier"
+      - method: "DateTimeDeidentifier"
+        uid: "date_deidentifier"
+        depends_on: ["id_deidentifier"]
+        configs:
+          idconfig:
+            name: "patient_id"
+            uid: "patient_id"
+            description: "Unique patient identifier"
+          time_shift_method: "random_days"
+          datetime_column: "admission_date"

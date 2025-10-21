@@ -1,0 +1,25 @@
+# IO Configuration for Cleared pipelines
+# This file contains the input/output configuration for data and de-identification reference tables
+
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./input"
+        file_format: "csv"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./output"
+        file_format: "csv"
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref"
+  runtime_io_path: "./runtime"

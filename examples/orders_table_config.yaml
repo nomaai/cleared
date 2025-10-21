@@ -1,0 +1,30 @@
+# Orders table configuration
+# This table depends on events table and uses the same user_id de-identification
+
+tables:
+  orders:
+    name: "orders"
+    depends_on: ["events"]
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "orders_user_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+      - method: "DateTimeDeidentifier"
+        uid: "orders_datetime_transformer"
+        depends_on: ["orders_user_id_transformer"]
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+          deid_config:
+            time_shift:
+              method: "shift_by_years"
+              min: -5
+              max: 5
+          datetime_column: "order_date_time"
