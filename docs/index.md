@@ -1,7 +1,7 @@
 # Cleared
 
 <div align="center">
-  <img src="logo.png" alt="Cleared Logo" width="200">
+  <img src="docs/logo.png" alt="Cleared Logo" width="200">
 </div>
 
 > Share data for scientific research confidently.
@@ -45,7 +45,6 @@
 | ✅ **Concept ID Filtering** | Create deidentification rules in values based on concept_id filters |
 | ✅ **Conditional De-identification** |  Ability to only apply de-identification rules|
 | ✅ **Pseudonymization Engine** | Deterministic, reversible pseudonyms for longitudinal tracking |
-| ✅ **Audit Logging** | Track all transformations for compliance and reproducibility especially as may be needed for medical devices |
 | ✅ **Custom Transformers PLugins** | Supports implementation of plugins for custom de-identification filters and methods  |
 | ✅ **Healthcare-Ready Defaults** | Includes mappings for demographics, identifiers, and care events |
 | ✅ **Configuration Reusability** | Leverages the well-known hydra configuration yaml file to facilitate reusability of existing configs, partial configuration imoporting, configuration inheritencfe and customizations |
@@ -65,15 +64,18 @@
 
 ## 📚 Getting Started
 
-1. [Quickstart](quickstart.md)
-2. [Multi-table De-identification](multi-table-deidentification.md)
-3. [Group-level ID de-identification](group-level-id-deidentification.md)
-4. [Date and Time Shifting](date-and-time-shifting.md)
-5. [Free-text PHI Detection](phi-detection.md)
-6. [Logging and Auditing](logging-and-auditing.md)
-7. [Healthcare Schema Support](healthcare-schema-support.md)
-8. [Custom Transformers Plugins](custom-transformers-plugins.md)
-10. [Contributing](contributing.md)
+1. [Quickstart](docs/quickstart.md) - Get started with single table de-identification
+2. [Using Configuration Files](docs/use_cleared_config.md) - De-identification with YAML configs and CLI
+3. [Multi-table De-identification](docs/multi_table_pipeline_config.md) - Handle related tables with consistent de-identification
+4. [Rerun De-identification with Consistency](docs/rerun_deidentification_consistency.md) - Maintain consistency when adding new data
+5. [UIDs de-identification](docs/group-level-id-deidentification.md)
+6. [CLI Usage Guide](docs/cli-usage.md)
+7. [Date and Time Shifting](docs/date-and-time-shifting.md)
+8. [Free-text PHI Detection](docs/phi-detection.md)
+9. [Logging and Auditing](docs/logging-and-auditing.md)
+10. [Healthcare Schema Support](docs/healthcare-schema-support.md)
+11. [Custom Transformers Plugins](docs/custom-transformers-plugins.md)
+12. [Contributing](docs/contributing.md)
 
 ## 🛣 Roadmap
 
@@ -85,6 +87,7 @@
 | OMOP  schema defaults                        | ✅ Completed |
 | Date/time & age shifting                     | ✅ Completed |
 | LLM PHI scanner                              | ⏳ Planned   |
+| Audit Logs                                   | ⏳ Planned   |
 | Synthetic patient generator                  | ⏳ Planned   |
 | Integration with MIMIC-IV & PhysioNet        | ⏳ Planned   |
 | Support for waveform & image metadata        | ⏳ Planned   |

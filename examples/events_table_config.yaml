@@ -1,0 +1,30 @@
+# Events table configuration
+# This table depends on users table and uses the same user_id de-identification
+
+tables:
+  events:
+    name: "events"
+    depends_on: ["users"]
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "events_user_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+      - method: "DateTimeDeidentifier"
+        uid: "events_datetime_transformer"
+        depends_on: ["events_user_id_transformer"]
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+          deid_config:
+            time_shift:
+              method: "shift_by_years"
+              min: -5
+              max: 5
+          datetime_column: "event_date_time"

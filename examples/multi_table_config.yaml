@@ -1,0 +1,24 @@
+# Multi-Table Configuration for multi_table_pipeline_config.md
+# This configuration extends the single-table approach to handle multiple related tables
+
+# Multi-table de-identification pipeline configuration
+# This configuration uses Hydra's import functionality to organize
+# configuration into separate, reusable files
+
+name: "multi_table_deid_pipeline"
+
+# De-identification configuration
+deid_config:
+  time_shift:
+    method: "shift_by_years"
+    min: -5
+    max: 5
+
+# Import configurations from separate files
+defaults:
+  - io_config
+  - users_table_config
+  - events_table_config  
+  - orders_table_config
+
+# Tables will be automatically merged from the imported configs

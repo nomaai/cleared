@@ -1,0 +1,66 @@
+# Initial de-identification configuration (Version 1)
+# This configuration creates the initial de-identification mappings
+
+name: "users_deid_pipeline_v1"
+deid_config:
+  time_shift:
+    method: "shift_by_years"
+    min: -5
+    max: 5
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./input"
+        file_format: "csv"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./output"
+        file_format: "csv"
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref_tables/v1"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref_tables/v1"
+  runtime_io_path: "./runtime"
+tables:
+  users:
+    name: "users"
+    depends_on: []
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "user_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+      - method: "DateTimeDeidentifier"
+        uid: "datetime_transformer"
+        depends_on: ["user_id_transformer"]
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+          deid_config:
+            time_shift:
+              method: "shift_by_years"
+              min: -5
+              max: 5
+          datetime_column: "reg_date_time"
+      - method: "ColumnDropper"
+        uid: "name_drop_transformer"
+        depends_on: ["datetime_transformer"]
+        configs:
+          idconfig:
+            name: "name"
+            uid: "name_drop"
+            description: "User name to drop"
