@@ -50,7 +50,16 @@ class TestTransformerRegistryIntegration:
         idconfig = IdentifierConfig(
             name="patient_id", uid="patient_id", description="Patient identifier"
         )
-        config = DictConfig({"idconfig": idconfig})
+        # Convert dataclass to dict for OmegaConf compatibility
+        config = DictConfig(
+            {
+                "idconfig": {
+                    "name": idconfig.name,
+                    "uid": idconfig.uid,
+                    "description": idconfig.description,
+                }
+            }
+        )
         transformer = registry.instantiate("IDDeidentifier", config)
 
         assert transformer.idconfig.name == "patient_id"

@@ -217,10 +217,10 @@ class TestRerunConsistencyTutorial(unittest.TestCase):
         # Create mapping dictionaries
         # The deid_ref files use idconfig.uid for original values and idconfig.deid_uid() for de-identified values
         v1_mappings = dict(
-            zip(v1_user_ref["user_uid"], v1_user_ref["user_uid__deid"], strict=False)
+            zip(v1_user_ref["user_uid"], v1_user_ref["user_uid__deid"])  # noqa: B905
         )
         v2_mappings = dict(
-            zip(v2_user_ref["user_uid"], v2_user_ref["user_uid__deid"], strict=False)
+            zip(v2_user_ref["user_uid"], v2_user_ref["user_uid__deid"])  # noqa: B905
         )
 
         # Check consistency for original users
@@ -293,10 +293,10 @@ class TestRerunConsistencyTutorial(unittest.TestCase):
         v2_user_ref = pd.read_csv(self.deid_ref_v2_dir / "user_uid.csv")
 
         v1_mappings = dict(
-            zip(v1_user_ref["user_uid"], v1_user_ref["user_uid__deid"], strict=False)
+            zip(v1_user_ref["user_uid"], v1_user_ref["user_uid__deid"])  # noqa: B905
         )
         v2_mappings = dict(
-            zip(v2_user_ref["user_uid"], v2_user_ref["user_uid__deid"], strict=False)
+            zip(v2_user_ref["user_uid"], v2_user_ref["user_uid__deid"])  # noqa: B905
         )
 
         # Check consistency
