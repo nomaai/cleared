@@ -199,7 +199,7 @@ def validate_config(
         "-cn",
         help="Name of the configuration to load",
     ),
-    overrides: list[str] | None = typer.Option(  # noqa: B008
+    overrides: Union[list[str], None] = typer.Option(  # noqa: B008, UP007
         None,
         "--override",
         "-o",
