@@ -31,3 +31,11 @@ rules:
     spaces: 2
     indent-sequences: true
     check-multi-line-strings: false
+ignore:
+  - .venv/
+  - .pytest_cache/
+  - .ruff_cache/
+  - .mypy_cache/
+  - .tox/
+  - .coverage/
+  - .coverage.*
