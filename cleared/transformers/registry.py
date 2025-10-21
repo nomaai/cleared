@@ -1,5 +1,7 @@
 """Transformer Registry for managing and instantiating transformers."""
 
+from __future__ import annotations
+
 from omegaconf import DictConfig
 from .base import BaseTransformer
 

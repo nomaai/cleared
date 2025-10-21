@@ -5,6 +5,8 @@ This module provides a concrete implementation of BaseDataLoader for
 SQL database data sources (PostgreSQL, MySQL, SQLite, etc.).
 """
 
+from __future__ import annotations
+
 from typing import Any
 import pandas as pd
 import sqlalchemy as sa

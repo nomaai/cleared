@@ -5,6 +5,8 @@ This module provides specialized pipeline classes that handle data loading
 and de-identification workflows with different scopes and configurations.
 """
 
+from __future__ import annotations
+
 import pandas as pd
 
 from .base import Pipeline, BaseTransformer

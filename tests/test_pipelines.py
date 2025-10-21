@@ -1,5 +1,7 @@
 """Comprehensive tests for Pipeline and TablePipeline classes."""
 
+from __future__ import annotations
+
 import pytest
 import pandas as pd
 import tempfile

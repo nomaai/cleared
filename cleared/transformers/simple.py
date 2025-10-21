@@ -1,5 +1,7 @@
 """Simple transformers for basic data operations."""
 
+from __future__ import annotations
+
 import pandas as pd
 from cleared.transformers.base import BaseTransformer
 from cleared.config.structure import IdentifierConfig

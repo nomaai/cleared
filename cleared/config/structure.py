@@ -4,6 +4,8 @@ Configuration structure for cleared.
 This module defines the dataclasses used for configuration throughout the Cleared framework.
 """
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -107,7 +109,7 @@ class ClearedIOConfig:
     runtime_io_path: str
 
     @classmethod
-    def default(cls) -> "ClearedIOConfig":
+    def default(cls) -> ClearedIOConfig:
         """Create a default ClearedIOConfig instance."""
         default_input = IOConfig(
             io_type="filesystem", configs={"base_path": "/tmp/input"}

@@ -1,5 +1,7 @@
 """Edge cases and error scenario tests for TransformerRegistry."""
 
+from __future__ import annotations
+
 import pytest
 from omegaconf import DictConfig
 from cleared.transformers.registry import (

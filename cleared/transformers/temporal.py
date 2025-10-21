@@ -5,6 +5,8 @@ This module provides transformers for de-identifying temporal data,
 including date and time shifting operations while preserving relative relationships.
 """
 
+from __future__ import annotations
+
 import pandas as pd
 import numpy as np
 from abc import ABC, abstractmethod

@@ -1,5 +1,7 @@
 """Transformers for id."""
 
+from __future__ import annotations
+
 import pandas as pd
 import numpy as np
 from cleared.transformers.base import BaseTransformer

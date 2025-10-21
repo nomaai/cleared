@@ -5,6 +5,8 @@ This module provides the main engine class that coordinates multiple pipelines
 and manages the overall de-identification process.
 """
 
+from __future__ import annotations
+
 from typing import Any, Literal
 import pandas as pd
 from dataclasses import dataclass, field
@@ -161,7 +163,7 @@ class ClearedEngine:
     @classmethod
     def from_config(
         cls, config: ClearedConfig, registry: TransformerRegistry | None = None
-    ) -> "ClearedEngine":
+    ) -> ClearedEngine:
         """
         Create a ClearedEngine from a configuration.
 
