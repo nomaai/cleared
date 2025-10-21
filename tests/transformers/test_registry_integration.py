@@ -214,13 +214,18 @@ class TestTransformerRegistryIntegration:
         # Test with nested DictConfig - only pass valid parameters
         from cleared.config.structure import IdentifierConfig
 
+        idconfig = IdentifierConfig(
+            name="patient_id",
+            uid="patient_id",
+            description="Patient identifier",
+        )
         complex_config = DictConfig(
             {
-                "idconfig": IdentifierConfig(
-                    name="patient_id",
-                    uid="patient_id",
-                    description="Patient identifier",
-                ),
+                "idconfig": {
+                    "name": idconfig.name,
+                    "uid": idconfig.uid,
+                    "description": idconfig.description,
+                },
                 "uid": "complex_transformer",
                 "dependencies": ["dep1", "dep2"],
             }
