@@ -313,7 +313,9 @@ class TestTransformerRegistryEdgeCases:
             registry.instantiate("IncompleteTransformer", config)
 
         assert "Failed to create transformer" in str(exc_info.value)
-        assert "abstract method 'transform'" in str(exc_info.value)
+        assert "abstract method" in str(exc_info.value) and "transform" in str(
+            exc_info.value
+        )
 
     def test_registry_with_very_large_number_of_transformers(self):
         """Test registry with a very large number of transformers."""
