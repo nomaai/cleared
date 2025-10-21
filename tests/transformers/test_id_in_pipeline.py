@@ -3,6 +3,7 @@
 import pandas as pd
 import numpy as np
 import tempfile
+from typing import Union
 from unittest.mock import patch
 from omegaconf import DictConfig
 
@@ -20,7 +21,7 @@ from cleared.io.base import BaseDataLoader
 class MockDataLoader(BaseDataLoader):
     """Mock data loader for testing."""
 
-    def __init__(self, config: dict | DictConfig):
+    def __init__(self, config: Union[dict, DictConfig]):  # noqa: UP007
         """
         Initialize the mock data loader.
 

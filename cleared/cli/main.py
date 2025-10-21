@@ -1,7 +1,7 @@
 """Main CLI application for Cleared data de-identification framework."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
 import typer
 from hydra.core.config_store import ConfigStore
@@ -49,7 +49,7 @@ def run_engine(
         "-cn",
         help="Name of the configuration to load",
     ),
-    overrides: list[str] | None = typer.Option(  # noqa: B008
+    overrides: Union[list[str], None] = typer.Option(  # noqa: B008, UP007
         None,
         "--override",
         "-o",
