@@ -591,9 +591,7 @@ class TestEventTypeFilteringIntegration:
             result_times = pd.to_datetime(events_output["event_date_time"])
 
             # All timestamps should be different
-            for orig_time, result_time in zip(
-                original_times, result_times, strict=False
-            ):
+            for orig_time, result_time in zip(original_times, result_times):  # noqa: B905
                 assert orig_time != result_time
 
     def test_filtered_deidentification_consistency_across_runs(self):

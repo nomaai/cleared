@@ -90,7 +90,7 @@ class TestFilteredDateTimeDeidentifier:
         assert not any(original_dates == deid_dates)
 
         # All dates should be shifted by a reasonable amount (30-90 days as configured)
-        for orig_date, deid_date in zip(original_dates, deid_dates, strict=False):
+        for orig_date, deid_date in zip(original_dates, deid_dates):  # noqa: B905
             shift_days = (deid_date - orig_date).days
             assert 30 <= shift_days <= 90
 
