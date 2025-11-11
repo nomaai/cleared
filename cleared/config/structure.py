@@ -54,6 +54,19 @@ class DeIDConfig:
 
 
 @dataclass
+class FilterConfig:
+    """Configuration for filtering operations."""
+
+    where_condition: str
+    description: str | None = None
+
+    def __post_init__(self):
+        """Validate the where condition."""
+        if not self.where_condition or not isinstance(self.where_condition, str):
+            raise ValueError("where_condition must be a non-empty string")
+
+
+@dataclass
 class TransformerConfig:
     """Configuration for a transformer."""
 
@@ -61,6 +74,10 @@ class TransformerConfig:
     uid: str | None = None
     depends_on: list[str] = field(default_factory=list)
     configs: dict[str, Any] = field(default_factory=dict)
+    filter: FilterConfig | None = None
+    value_cast: str | None = (
+        None  # "integer", "float", "string", "datetime" - casts the de-identification column to this type
+    )
 
     def __post_init__(self):
         """Validate that method is a valid transformer name."""
@@ -72,6 +89,14 @@ class TransformerConfig:
                 f"method must be a valid transformer name. "
                 f"method: {self.method}, valid transformer names: {get_expected_transformer_names()}"
             )
+
+        # Validate value_cast if provided
+        if self.value_cast is not None:
+            valid_casts = ["integer", "float", "string", "datetime"]
+            if self.value_cast not in valid_casts:
+                raise ValueError(
+                    f"value_cast must be one of {valid_casts}, got '{self.value_cast}'"
+                )
 
 
 @dataclass

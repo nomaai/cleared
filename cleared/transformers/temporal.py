@@ -10,11 +10,16 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 from abc import ABC, abstractmethod
-from cleared.transformers.base import BaseTransformer
-from cleared.config.structure import IdentifierConfig, DeIDConfig, TimeShiftConfig
+from cleared.transformers.base import FilterableTransformer
+from cleared.config.structure import (
+    IdentifierConfig,
+    DeIDConfig,
+    TimeShiftConfig,
+    FilterConfig,
+)
 
 
-class DateTimeDeidentifier(BaseTransformer):
+class DateTimeDeidentifier(FilterableTransformer):
     """De-identifier for date and time columns using time shifting."""
 
     def __init__(
@@ -23,6 +28,8 @@ class DateTimeDeidentifier(BaseTransformer):
         deid_config: DeIDConfig,
         datetime_column: str,
         time_shift_method: str | None = None,
+        filter_config: FilterConfig | None = None,
+        value_cast: str | None = None,
         uid: str | None = None,
         dependencies: list[str] | None = None,
     ):
@@ -34,11 +41,18 @@ class DateTimeDeidentifier(BaseTransformer):
             deid_config: De-identification configuration
             datetime_column: Name of the datetime column to shift
             time_shift_method: Name of the time shift method to apply
+            filter_config: Configuration for filtering operations
+            value_cast: Type to cast the de-identification column to
             uid: Unique identifier for the transformer
             dependencies: List of dependency UIDs
 
         """
-        super().__init__(uid=uid, dependencies=dependencies)
+        super().__init__(
+            filter_config=filter_config,
+            value_cast=value_cast,
+            uid=uid,
+            dependencies=dependencies,
+        )
         self.idconfig = idconfig
         self.deid_config = deid_config
         self.datetime_column = datetime_column
@@ -60,7 +74,11 @@ class DateTimeDeidentifier(BaseTransformer):
             self.deid_config.time_shift
         )
 
-    def transform(
+    def _get_column_to_cast(self) -> str | None:
+        """Get the column name to cast (the datetime column being de-identified)."""
+        return self.datetime_column
+
+    def _apply_transform(
         self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
     ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
         """
@@ -89,6 +107,8 @@ class DateTimeDeidentifier(BaseTransformer):
             raise ValueError(
                 f"Reference column '{self.idconfig.name}' not found in DataFrame"
             )
+        if self.datetime_column not in df.columns:
+            raise ValueError(f"Column '{self.datetime_column}' not found in DataFrame")
 
         # Handle empty DataFrame
         if len(df) == 0:

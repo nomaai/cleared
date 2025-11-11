@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import pandas as pd
 import numpy as np
-from cleared.transformers.base import BaseTransformer
-from cleared.config.structure import IdentifierConfig
+from cleared.transformers.base import FilterableTransformer
+from cleared.config.structure import IdentifierConfig, FilterConfig
 
 
-class IDDeidentifier(BaseTransformer):
+class IDDeidentifier(FilterableTransformer):
     """De-identifier for id columns."""
 
     def __init__(
         self,
         idconfig: IdentifierConfig | dict,
+        filter_config: FilterConfig | None = None,
+        value_cast: str | None = None,
         uid: str | None = None,
         dependencies: list[str] | None = None,
     ):
@@ -22,11 +24,18 @@ class IDDeidentifier(BaseTransformer):
 
         Args:
             idconfig (IdentifierConfig or dict): Configuration for the ID column to de-identify
+            filter_config (FilterConfig, optional): Configuration for filtering operations
+            value_cast (str, optional): Type to cast the de-identification column to
             uid (str, optional): Unique identifier for the transformer
             dependencies (list[str], optional): List of dependency UIDs
 
         """
-        super().__init__(uid=uid, dependencies=dependencies)
+        super().__init__(
+            filter_config=filter_config,
+            value_cast=value_cast,
+            uid=uid,
+            dependencies=dependencies,
+        )
 
         # Handle both IdentifierConfig object and dict
         if isinstance(idconfig, dict):
@@ -41,7 +50,11 @@ class IDDeidentifier(BaseTransformer):
         if self.idconfig is None:
             raise ValueError("idconfig is required for IDDeidentifier")
 
-    def transform(
+    def _get_column_to_cast(self) -> str | None:
+        """Get the column name to cast (the ID column being de-identified)."""
+        return self.idconfig.name if self.idconfig else None
+
+    def _apply_transform(
         self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
     ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
         """
@@ -91,7 +104,8 @@ class IDDeidentifier(BaseTransformer):
         columns_to_drop = [self.idconfig.deid_uid()]
         if self.idconfig.uid != self.idconfig.name:
             columns_to_drop.append(self.idconfig.uid)
-        merged.drop(columns=columns_to_drop, inplace=True)
+        if columns_to_drop:
+            merged.drop(columns=columns_to_drop, inplace=True)
 
         # Update the deid_ref_dict with the new/updated deid_ref_df
         updated_deid_ref_dict = deid_ref_dict.copy()

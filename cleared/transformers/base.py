@@ -6,6 +6,10 @@ from abc import ABC, abstractmethod
 import pandas as pd
 from uuid import uuid4
 import networkx as nx
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from cleared.config.structure import FilterConfig
 
 
 class BaseTask(ABC):  # noqa: B024
@@ -75,6 +79,194 @@ class BaseTransformer(BaseTask):
         pass
 
 
+class FilterableTransformer(BaseTransformer):
+    """Filterable transformer class that applies filters before transformation."""
+
+    def __init__(
+        self,
+        filter_config: FilterConfig | None = None,
+        value_cast: str | None = None,
+        uid: str | None = None,
+        dependencies: list[str] | None = None,
+    ):
+        """
+        Initialize the filterable transformer.
+
+        Args:
+            filter_config: Configuration for filtering operations
+            value_cast: Type to cast the de-identification column to ("integer", "float", "string", "datetime")
+            uid: Unique identifier for the transformer
+            dependencies: List of dependency UIDs
+
+        """
+        super().__init__(uid, dependencies)
+        self.filter_config = filter_config
+        self.value_cast = value_cast
+        self._original_index = None
+        self._filtered_indices = None
+
+    def transform(
+        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """
+        Transform the input DataFrame and update the de-identification reference dictionary.
+
+        Args:
+            df: Input DataFrame to transform
+            deid_ref_dict: Dictionary of De-identification reference DataFrames
+        Returns:
+            Tuple of (transformed_df, updated_deid_ref_dict)
+
+        """
+        # Store original index for later reconstruction
+        self._original_index = df.index.copy()
+
+        # Apply filters to get subset
+        filtered_df = self.apply_filters(df)
+        self._filtered_indices = filtered_df.index
+
+        # Apply value casting if specified (after filtering, before transformation)
+        if self.value_cast is not None:
+            filtered_df = self._apply_value_cast(filtered_df)
+
+        # Apply the actual transformation to the filtered subset
+        transformed_df, updated_deid_ref_dict = self._apply_transform(
+            filtered_df, deid_ref_dict
+        )
+
+        # Ensure transformed_df has the same index as filtered_df
+        transformed_df = transformed_df.set_index(filtered_df.index)
+
+        # Reconstruct the full DataFrame with original row order
+        result_df = self.undo_filters(df, transformed_df)
+
+        return result_df, updated_deid_ref_dict
+
+    def apply_filters(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Apply the filters to the input DataFrame using SQL-like WHERE conditions.
+
+        Args:
+            df: Input DataFrame to filter
+        Returns:
+            Filtered DataFrame containing only rows that match the filter condition
+
+        """
+        if self.filter_config is None:
+            return df
+
+        try:
+            # Use pandas query method to apply SQL-like WHERE conditions
+            filtered_df = df.query(self.filter_config.where_condition)
+            return filtered_df
+        except Exception as e:
+            raise ValueError(
+                f"Invalid filter condition '{self.filter_config.where_condition}': {e!s}"
+            ) from e
+
+    def undo_filters(
+        self, original_df: pd.DataFrame, transformed_df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Reconstruct the full DataFrame by merging transformed rows back into original positions.
+
+        Args:
+            original_df: Original DataFrame before filtering
+            transformed_df: DataFrame after transformation of filtered subset
+        Returns:
+            Full DataFrame with transformed rows in their original positions
+
+        """
+        if self.filter_config is None or self._filtered_indices is None:
+            return transformed_df
+
+        # Create a copy of the original DataFrame
+        result_df = original_df.copy()
+
+        # Use vectorized operations to update the filtered rows
+        # Assumes columns between original and transformed are the same
+        result_df.loc[self._filtered_indices] = transformed_df.loc[
+            self._filtered_indices
+        ]
+        return result_df
+
+    def _get_column_to_cast(self) -> str | None:
+        """
+        Get the name of the column that should be cast.
+
+        Subclasses should override this method to return the column name
+        that should be cast when value_cast is specified.
+
+        Returns:
+            Column name to cast, or None if not applicable
+
+        """
+        return None
+
+    def _apply_value_cast(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Apply value casting to the de-identification column if value_cast is specified.
+
+        Args:
+            df: DataFrame to cast values in
+
+        Returns:
+            DataFrame with cast values
+
+        """
+        if self.value_cast is None:
+            return df
+
+        column_name = self._get_column_to_cast()
+        if column_name is None or column_name not in df.columns:
+            return df
+
+        df = df.copy()
+
+        try:
+            if self.value_cast == "integer":
+                # Convert to integer, handling strings that represent integers
+                numeric_series = pd.to_numeric(df[column_name], errors="coerce")
+                # Use nullable integer type if there are any NaN values, otherwise int64
+                if numeric_series.isna().any():
+                    df[column_name] = numeric_series.astype("Int64")
+                else:
+                    df[column_name] = numeric_series.astype("int64")
+            elif self.value_cast == "float":
+                # Convert to float
+                df[column_name] = pd.to_numeric(
+                    df[column_name], errors="coerce"
+                ).astype("float64")
+            elif self.value_cast == "string":
+                # Convert to string
+                df[column_name] = df[column_name].astype(str)
+            elif self.value_cast == "datetime":
+                # Convert to datetime, handling various input formats
+                df[column_name] = pd.to_datetime(df[column_name], errors="coerce")
+        except Exception as e:
+            raise ValueError(
+                f"Failed to cast column '{column_name}' to {self.value_cast}: {e!s}"
+            ) from e
+
+        return df
+
+    @abstractmethod
+    def _apply_transform(
+        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """
+        Apply the actual transformation to the filtered DataFrame.
+
+        Args:
+            df: Filtered DataFrame to transform
+            deid_ref_dict: Dictionary of De-identification reference DataFrames
+        Returns:
+            Tuple of (transformed_df, updated_deid_ref_dict)
+
+        """
+        pass
+
+
 # ============================================================
 # PIPELINE CLASS (ALSO A TRANSFORMER)
 # ============================================================
@@ -88,6 +280,7 @@ class Pipeline(BaseTransformer):
         uid: str | None = None,
         transformers: list[BaseTransformer] | None = None,
         dependencies: list[str] | None = None,
+        sequential_execution: bool = True,
     ):
         """
         Initialize the pipeline.
@@ -96,10 +289,12 @@ class Pipeline(BaseTransformer):
             uid: Unique identifier for the pipeline (default is a random UUID)
             transformers: List of transformers to add to the pipeline (default is an empty list if None)
             dependencies: List of dependencies of the pipeline (default is an empty list if None)
+            sequential_execution: Whether to execute the transformers in sequence (default is True)
 
         """
         super().__init__(uid, dependencies)
         self.__transformers = [] if transformers is None else transformers
+        self.sequential_execution = sequential_execution
 
     def add_transformer(self, transformer: BaseTransformer):
         """Add a transformer to the pipeline."""
@@ -107,12 +302,6 @@ class Pipeline(BaseTransformer):
             raise ValueError("Transformer must be specified and must not be None")
 
         self.__transformers.append(transformer)
-
-    def execute(self) -> None:
-        """Execute the pipeline by running all transformers in sequence."""
-        # This is a base implementation - subclasses should override this
-        # to provide specific execution logic
-        pass
 
     def transform(
         self,
@@ -138,6 +327,24 @@ class Pipeline(BaseTransformer):
         if len(self.__transformers) == 0:
             return df, deid_ref_dict
 
+        if self.sequential_execution:
+            return self._transform_sequentially(df, deid_ref_dict)
+        else:
+            return self._transform_in_parallel(df, deid_ref_dict)
+
+    def _transform_sequentially(
+        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """Transform the data using the transformers in the pipeline in sequence."""
+        result_df = df
+        for transformer in self.__transformers:
+            result_df, deid_ref_dict = transformer.transform(result_df, deid_ref_dict)
+        return result_df, deid_ref_dict
+
+    def _transform_in_parallel(
+        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """Transform the data using the transformers in the pipeline in parallel."""
         # Build and execute DAG
         graph = nx.DiGraph()
         transformer_map = {tf.uid: tf for tf in self.__transformers}
