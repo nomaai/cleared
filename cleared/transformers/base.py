@@ -155,8 +155,10 @@ class FilterableTransformer(BaseTransformer):
         if self.filter_config is None:
             return df
 
+        # Use pandas query method to apply SQL-like WHERE conditions
+        # Pandas will raise exceptions (SyntaxError, UndefinedVariableError, etc.) for invalid conditions
+        # We wrap them as ValueError for consistent API and to include the filter condition in the error message
         try:
-            # Use pandas query method to apply SQL-like WHERE conditions
             filtered_df = df.query(self.filter_config.where_condition)
             return filtered_df
         except Exception as e:

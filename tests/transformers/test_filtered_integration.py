@@ -308,7 +308,7 @@ class TestFilteredDeidentificationIntegration(unittest.TestCase):
                     # Dates should be different (shifted by 30-90 days)
                     self.assertNotEqual(original_date_str, deid_date_str)
                     # Verify the date string format is correct (contains date/time)
-                    self.assertIn("2023", deid_date_str or "2024" in deid_date_str)
+                    self.assertTrue("2023" in deid_date_str or "2024" in deid_date_str)
 
             # event_value (datetime) should be de-identified for survey events
             # Work with strings as they come from CSV
@@ -319,7 +319,9 @@ class TestFilteredDeidentificationIntegration(unittest.TestCase):
                     # Values should be different (shifted by 30-90 days)
                     self.assertNotEqual(original_value_str, deid_value_str)
                     # Verify the date string format is correct
-                    self.assertIn("2023", deid_value_str or "2024" in deid_value_str)
+                    self.assertTrue(
+                        "2023" in deid_value_str or "2024" in deid_value_str
+                    )
 
             # Test 3: Verify user submitted events have event_value de-identified
             user_submitted_deid = events_deid[
@@ -416,7 +418,7 @@ class TestFilteredDeidentificationIntegration(unittest.TestCase):
                     # Should be different (shifted)
                     self.assertNotEqual(original_date_str, deid_date_str)
                     # Verify the date string format is correct
-                    self.assertIn("2023", deid_date_str or "2024" in deid_date_str)
+                    self.assertTrue("2023" in deid_date_str or "2024" in deid_date_str)
 
     def test_user_submitted_events_id_deidentification(self):
         """Test that user submitted events have event_value (user_id) de-identified."""
