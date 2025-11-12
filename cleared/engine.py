@@ -15,7 +15,12 @@ import glob
 import json
 
 from datetime import datetime
-from .config.structure import DeIDConfig, ClearedIOConfig, ClearedConfig
+from .config.structure import (
+    DeIDConfig,
+    ClearedIOConfig,
+    ClearedConfig,
+    TransformerConfig,
+)
 from .transformers.pipelines import TablePipeline
 from .transformers.base import Pipeline
 from .transformers.registry import TransformerRegistry
@@ -207,6 +212,60 @@ class ClearedEngine:
         )
         self._pipelines = self._load_pipelines_from_config(config)
 
+    def _create_transformer_config_dict(
+        self, transformer_config: TransformerConfig
+    ) -> dict[str, Any]:
+        """
+        Create a configuration dictionary for transformer instantiation.
+
+        This method builds the complete config dict including filter_config and value_cast
+        if the transformer class supports them.
+
+        Args:
+            transformer_config: Transformer configuration from the pipeline config
+
+        Returns:
+            Dictionary of configuration arguments for transformer instantiation
+
+        """
+        from .transformers.base import FilterableTransformer
+
+        # Start with the base configs
+        config_dict = {**transformer_config.configs}
+
+        # Get transformer class from registry to check for properties
+        transformer_class = self._registry.get_class(transformer_config.method)
+
+        # Check if class inherits from FilterableTransformer (which supports filter_config and value_cast)
+        # Handle case where get_class might return a mock in tests
+        try:
+            supports_filter_and_cast = isinstance(
+                transformer_class, type
+            ) and issubclass(transformer_class, FilterableTransformer)
+        except (TypeError, AttributeError):
+            # If transformer_class is not a real class (e.g., a mock), default to False
+            supports_filter_and_cast = False
+
+        # Add filter_config if present and class supports it
+        if transformer_config.filter is not None:
+            if supports_filter_and_cast:
+                config_dict["filter_config"] = transformer_config.filter
+            else:
+                raise ValueError(
+                    f"Transformer {transformer_config.method} does not support filter_config but it was provided!"
+                )
+
+        # Add value_cast if present and class supports it
+        if transformer_config.value_cast is not None:
+            if supports_filter_and_cast:
+                config_dict["value_cast"] = transformer_config.value_cast
+            else:
+                raise ValueError(
+                    f"Transformer {transformer_config.method} does not support value_cast but it was provided!"
+                )
+
+        return config_dict
+
     def _load_pipelines_from_config(self, config: ClearedConfig) -> list[TablePipeline]:
         """
         Load the pipelines from the configuration.
@@ -219,9 +278,14 @@ class ClearedEngine:
         for table_name, table_config in config.tables.items():
             pip = TablePipeline(table_name, config.io.data, config.deid_config)
             for transformer_config in table_config.transformers:
+                # Create complete config dict including filter_config and value_cast
+                config_dict = self._create_transformer_config_dict(transformer_config)
+
+                # Create transformer with complete configs
                 transformer = self._registry.instantiate(
-                    transformer_config.method, transformer_config.configs
+                    transformer_config.method, config_dict
                 )
+
                 pip.add_transformer(transformer)
 
             pipelines.append(pip)
@@ -261,37 +325,9 @@ class ClearedEngine:
 
         # Execute each pipeline
         for table_pipeline in self._pipelines:
-            try:
-                pipeline_uid = table_pipeline.uid
-                results.add_execution_order(pipeline_uid)
-
-                # Run the pipeline
-                if hasattr(table_pipeline, "transform") and callable(
-                    table_pipeline.transform
-                ):
-                    # Pipeline has transform method - execute it
-                    _, current_deid_ref_dict = table_pipeline.transform(
-                        df=None, deid_ref_dict=current_deid_ref_dict
-                    )
-
-                    # Store pipeline result
-                    results.add_pipeline_result(pipeline_uid, "success")
-                else:
-                    results.add_pipeline_result(
-                        pipeline_uid,
-                        "error",
-                        f"Pipeline {pipeline_uid} does not have a transform method",
-                    )
-
-            except Exception as e:
-                results.add_pipeline_result(
-                    pipeline_uid, "error", f"Pipeline {pipeline_uid} failed: {e!s}"
-                )
-
-                # Stop execution if not continuing on error
-                if not continue_on_error:
-                    results.set_success(False)
-                    raise RuntimeError(f"Pipeline execution failed: {e!s}") from e
+            current_deid_ref_dict = self._run_table_pipeline(
+                table_pipeline, results, current_deid_ref_dict, continue_on_error
+            )
 
         # Store results in instance
         self.results = results
@@ -301,6 +337,66 @@ class ClearedEngine:
         self._save_deid_ref_files(current_deid_ref_dict)
 
         return results
+
+    def _run_table_pipeline(
+        self,
+        table_pipeline: TablePipeline,
+        results: Results,
+        current_deid_ref_dict: dict[str, pd.DataFrame],
+        continue_on_error: bool,
+    ) -> dict[str, pd.DataFrame]:
+        """
+        Run a table pipeline and update the de-identification reference dictionary.
+
+        Args:
+            table_pipeline: TablePipeline to run
+            results: Results to store
+            current_deid_ref_dict: Current de-identification reference dictionary
+            continue_on_error: Whether to continue execution if this pipeline fails
+
+        Returns:
+            Updated de-identification reference dictionary
+
+        Raises:
+            RuntimeError: If pipeline execution fails and continue_on_error is False
+
+        """
+        pipeline_uid = table_pipeline.uid
+        results.add_execution_order(pipeline_uid)
+
+        try:
+            # Run the pipeline
+            if hasattr(table_pipeline, "transform") and callable(
+                table_pipeline.transform
+            ):
+                # Pipeline has transform method - execute it
+                _, updated_deid_ref_dict = table_pipeline.transform(
+                    df=None, deid_ref_dict=current_deid_ref_dict
+                )
+
+                # Store pipeline result
+                results.add_pipeline_result(pipeline_uid, "success")
+                return updated_deid_ref_dict
+            else:
+                results.add_pipeline_result(
+                    pipeline_uid,
+                    "error",
+                    f"Pipeline {pipeline_uid} does not have a transform method",
+                )
+                return current_deid_ref_dict
+
+        except Exception as e:
+            results.add_pipeline_result(
+                pipeline_uid, "error", f"Pipeline {pipeline_uid} failed: {e!s}"
+            )
+
+            # Stop execution if not continuing on error
+            if not continue_on_error:
+                results.set_success(False)
+                raise RuntimeError(f"Pipeline execution failed: {e!s}") from e
+
+            # If continuing on error, return the unchanged deid_ref_dict
+            return current_deid_ref_dict
 
     def _load_initial_deid_ref_dict(self) -> dict[str, pd.DataFrame]:
         """

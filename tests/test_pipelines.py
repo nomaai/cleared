@@ -258,7 +258,9 @@ class TestPipeline:
         transformer1 = MockTransformer("transformer1", dependencies=["transformer2"])
         transformer2 = MockTransformer("transformer2", dependencies=["transformer1"])
 
-        pipeline = Pipeline(transformers=[transformer1, transformer2])
+        pipeline = Pipeline(
+            transformers=[transformer1, transformer2], sequential_execution=False
+        )
 
         df = pd.DataFrame({"col1": [1, 2, 3]})
         deid_ref_dict = {"test": pd.DataFrame({"ref_col": ["a", "b", "c"]})}

@@ -85,16 +85,16 @@ class SampleData:
             {
                 "user_id": [101, 101, 202, 202, 303, 303, 404, 505, 505, 505],
                 "event_name": [
-                    "login",
-                    "purchase",
-                    "login",
-                    "logout",
-                    "login",
-                    "purchase",
-                    "login",
-                    "login",
-                    "purchase",
-                    "logout",
+                    "sensor_1",
+                    "sensor_2",
+                    "sensor_1",
+                    "sensor_3",
+                    "sensor_1",
+                    "sensor_2",
+                    "sensor_1",
+                    "sensor_1",
+                    "sensor_2",
+                    "sensor_3",
                 ],
                 "event_value": [
                     100.0,
@@ -119,6 +119,96 @@ class SampleData:
                     datetime(2023, 5, 20, 13, 10),
                     datetime(2023, 5, 25, 16, 30),
                     datetime(2023, 5, 25, 18, 45),
+                ],
+            }
+        )
+
+    @property
+    def events_with_surveys(self) -> pd.DataFrame:
+        """
+        Sample events data with survey submission dates for filtered de-identification tutorials.
+
+        Returns:
+            DataFrame with event data including user_id, event_name, event_value (datetime for surveys), and event_date_time
+
+        """
+        return pd.DataFrame(
+            {
+                "user_id": [
+                    101,
+                    101,
+                    202,
+                    202,
+                    202,
+                    303,
+                    303,
+                    404,
+                    505,
+                    505,
+                    505,
+                    505,
+                    303,
+                    303,
+                    303,
+                    303,
+                ],
+                "event_name": [
+                    "sensor_1",
+                    "sensor_2",
+                    "Survey submission date",
+                    "user submitted",
+                    "sensor_1",
+                    "sensor_3",
+                    "sensor_1",
+                    "sensor_2",
+                    "sensor_1",
+                    "sensor_1",
+                    "Survey submission date",
+                    "user submitted",
+                    "sensor_2",
+                    "sensor_3",
+                    "Survey submission date",
+                    "user submitted",
+                ],
+                "event_value": [
+                    "100.0",
+                    "250.0",
+                    "2023-01-20 10:15:00",  # Survey submission date
+                    "101",  # user submitted - contains user_id
+                    "50.0",
+                    "0.0",
+                    "75.0",
+                    "300.0",
+                    "25.0",
+                    "150.0",
+                    "2023-02-12 14:30:00",  # Survey submission date
+                    "202",  # user submitted - contains user_id
+                    "400.0",
+                    "0.0",
+                    "2023-03-18 09:45:00",  # Survey submission date
+                    "303",  # user submitted - contains user_id
+                ],
+                "event_date_time": [
+                    datetime(2023, 1, 10, 8, 30),
+                    datetime(2023, 1, 15, 14, 20),
+                    datetime(2023, 1, 20, 10, 15),  # Survey submission date
+                    datetime(
+                        2023, 1, 20, 10, 16
+                    ),  # user submitted - right after survey
+                    datetime(2023, 2, 5, 9, 45),
+                    datetime(2023, 2, 5, 17, 30),
+                    datetime(2023, 3, 12, 10, 15),
+                    datetime(2023, 3, 12, 15, 45),
+                    datetime(2023, 4, 8, 11, 20),
+                    datetime(2023, 5, 20, 13, 10),
+                    datetime(2023, 2, 12, 14, 30),  # Survey submission date
+                    datetime(
+                        2023, 2, 12, 14, 31
+                    ),  # user submitted - right after survey
+                    datetime(2023, 5, 25, 16, 30),
+                    datetime(2023, 5, 25, 18, 45),
+                    datetime(2023, 3, 18, 9, 45),  # Survey submission date
+                    datetime(2023, 3, 18, 9, 46),  # user submitted - right after survey
                 ],
             }
         )
