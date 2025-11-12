@@ -158,8 +158,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: |
           git add VERSION pyproject.toml CHANGELOG.md
-          git commit -m "chore: bump version 
-          to ${{ steps.version_bump.outputs.new_version }}" || echo "No changes to commit"
+          git commit -m "chore: bump version to ${{ steps.version_bump.outputs.new_version }}" || echo "No changes to commit"
           git push origin HEAD:${{ github.ref_name }} || echo "Nothing to push"
 
       - name: Create and push tag
@@ -298,7 +297,8 @@ jobs:
           fi
           
           # Publish using Poetry (publish command uses dist/ by default)
-          poetry publish --username __token__ --password "${{ secrets.PYPI_API_TOKEN }}" --no-interaction || {
+          # Poetry will automatically use POETRY_PYPI_TOKEN_PYPI environment variable
+          poetry publish --no-interaction || {
             echo "Publishing failed. This might be because:"
             echo "  - The version already exists on PyPI"
             echo "  - PyPI API token is invalid"
