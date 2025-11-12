@@ -6,7 +6,7 @@ Thank you for your interest in contributing to Cleared! This guide will help you
 
 Before you begin, ensure you have:
 
-- **Python 3.9+** installed
+- **Python 3.10+** installed
 - **Git** installed and configured
 - **Terminal/command line** access
 - **GitHub account** (for submitting pull requests)

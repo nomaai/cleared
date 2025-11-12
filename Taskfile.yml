@@ -14,7 +14,7 @@
 #   4. task test               # Run tests to ensure everything works
 #
 # PREREQUISITES:
-#   - Python 3.9+ installed
+#   - Python 3.10+ installed
 #   - Git repository cloned
 #   - Terminal/command line access
 #
