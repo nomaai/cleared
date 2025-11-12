@@ -281,9 +281,11 @@ class ClearedEngine:
                 # Create complete config dict including filter_config and value_cast
                 config_dict = self._create_transformer_config_dict(transformer_config)
 
-                # Create transformer with complete configs
+                # Create transformer with complete configs and global_deid_config
                 transformer = self._registry.instantiate(
-                    transformer_config.method, config_dict
+                    transformer_config.method,
+                    config_dict,
+                    global_deid_config=config.deid_config,
                 )
 
                 pip.add_transformer(transformer)

@@ -45,7 +45,7 @@ class TestFilteredDateTimeDeidentifier:
         """Test initialization without filter config."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="visit_date",
         )
 
@@ -58,7 +58,7 @@ class TestFilteredDateTimeDeidentifier:
         filter_config = FilterConfig(where_condition="age > 30")
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="visit_date",
             filter_config=filter_config,
         )
@@ -70,7 +70,7 @@ class TestFilteredDateTimeDeidentifier:
         """Test transformation without any filter applied."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="visit_date",
         )
 
@@ -99,7 +99,7 @@ class TestFilteredDateTimeDeidentifier:
         filter_config = FilterConfig(where_condition="age > 30")
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="visit_date",
             filter_config=filter_config,
         )
@@ -132,7 +132,7 @@ class TestFilteredDateTimeDeidentifier:
         filter_config = FilterConfig(where_condition="department == 'A'")
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="visit_date",
             filter_config=filter_config,
         )
@@ -165,7 +165,7 @@ class TestFilteredDateTimeDeidentifier:
         filter_config = FilterConfig(where_condition="priority == 'high'")
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="visit_date",
             filter_config=filter_config,
         )
@@ -200,7 +200,7 @@ class TestFilteredDateTimeDeidentifier:
         )
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="visit_date",
             filter_config=filter_config,
         )
@@ -243,7 +243,7 @@ class TestFilteredDateTimeDeidentifier:
         filter_config = FilterConfig(where_condition="age > 30")
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="visit_date",
             filter_config=filter_config,
         )
@@ -266,7 +266,7 @@ class TestFilteredDateTimeDeidentifier:
         filter_config = FilterConfig(where_condition="age > 30")
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="visit_date",
             filter_config=filter_config,
         )
@@ -307,7 +307,7 @@ class TestFilteredDateTimeDeidentifier:
         filter_config = FilterConfig(where_condition="invalid_column > 30")
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="visit_date",
             filter_config=filter_config,
         )
@@ -320,7 +320,7 @@ class TestFilteredDateTimeDeidentifier:
         filter_config = FilterConfig(where_condition="age > 100")  # No patients match
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="visit_date",
             filter_config=filter_config,
         )
@@ -338,7 +338,7 @@ class TestFilteredDateTimeDeidentifier:
         filter_config = FilterConfig(where_condition="age > 30")
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="visit_date",
             filter_config=filter_config,
         )
@@ -365,7 +365,7 @@ class TestFilteredDateTimeDeidentifier:
         filter_config = FilterConfig(where_condition="age > 30")
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=random_deid_config,
+            global_deid_config=random_deid_config,
             datetime_column="visit_date",
             filter_config=filter_config,
         )
@@ -380,7 +380,7 @@ class TestFilteredDateTimeDeidentifier:
         filter_config = FilterConfig(where_condition="age > 30")
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="nonexistent_column",
             filter_config=filter_config,
         )
@@ -398,7 +398,7 @@ class TestFilteredDateTimeDeidentifier:
         filter_config = FilterConfig(where_condition="age > 30")
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="visit_date",
             filter_config=filter_config,
         )

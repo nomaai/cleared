@@ -67,21 +67,26 @@ def _merge_hydra_configs(main_cfg: dict, config_dir: Path) -> dict:
     """
     import yaml
 
-    # Start with the main config (excluding defaults)
-    merged_cfg = {k: v for k, v in main_cfg.items() if k != "defaults"}
+    # Start with an empty config
+    merged_cfg = {}
 
-    # Process each import in the defaults list
+    # Process each import in the defaults list first (base configs)
     for import_name in main_cfg.get("defaults", []):
         import_file = config_dir / f"{import_name}.yaml"
 
         if import_file.exists():
             with open(import_file) as f:
                 import_cfg = yaml.safe_load(f)
-
-            # Merge the imported config
-            merged_cfg = _deep_merge(merged_cfg, import_cfg)
+                # Remove defaults from imported config to avoid recursion
+                import_cfg = {k: v for k, v in import_cfg.items() if k != "defaults"}
+                # Merge the imported config (base configs merge first)
+                merged_cfg = _deep_merge(merged_cfg, import_cfg)
         else:
             print(f"Warning: Import file {import_file} not found, skipping...")
+
+    # Finally, merge the main config on top (main config overrides base configs)
+    main_cfg_no_defaults = {k: v for k, v in main_cfg.items() if k != "defaults"}
+    merged_cfg = _deep_merge(merged_cfg, main_cfg_no_defaults)
 
     return merged_cfg
 
@@ -128,7 +133,11 @@ def _hydra_to_cleared_config(cfg: Any) -> ClearedConfig:
     if time_shift_data:
         from cleared.config.structure import TimeShiftConfig
 
-        time_shift = TimeShiftConfig(**time_shift_data)
+        # Filter out unsupported fields like 'ref_id' (if any)
+        time_shift_dict = {
+            k: v for k, v in time_shift_data.items() if k in ["method", "min", "max"]
+        }
+        time_shift = TimeShiftConfig(**time_shift_dict)
 
     deid_config = DeIDConfig(time_shift=time_shift)
 

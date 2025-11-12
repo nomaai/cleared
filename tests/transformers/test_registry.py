@@ -21,8 +21,8 @@ class TestTransformerRegistry:
 
         # Create a mock transformer class for testing
         class MockTransformer(BaseTransformer):
-            def __init__(self, test_param: str = "default"):
-                super().__init__()
+            def __init__(self, test_param: str = "default", global_deid_config=None):
+                super().__init__(global_deid_config=global_deid_config)
                 self.test_param = test_param
 
             def transform(

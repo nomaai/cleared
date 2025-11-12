@@ -155,17 +155,17 @@ class TestMultiTableDeidentification(unittest.TestCase):
         id_deid = IDDeidentifier(idconfig=self.user_id_config)
         datetime_deid_reg = DateTimeDeidentifier(
             idconfig=self.user_id_config,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="reg_date_time",
         )
         datetime_deid_event = DateTimeDeidentifier(
             idconfig=self.user_id_config,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="event_date_time",
         )
         datetime_deid_order = DateTimeDeidentifier(
             idconfig=self.user_id_config,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="order_date_time",
         )
         name_drop = ColumnDropper(
@@ -368,7 +368,7 @@ class TestMultiTableDeidentification(unittest.TestCase):
         id_deid = IDDeidentifier(idconfig=self.user_id_config)
         datetime_deid = DateTimeDeidentifier(
             idconfig=self.user_id_config,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="reg_date_time",
         )
         name_drop = ColumnDropper(
@@ -386,7 +386,7 @@ class TestMultiTableDeidentification(unittest.TestCase):
         events_df_deid, events_ref = id_deid.transform(events_simple, users_ref)
         events_datetime_deid = DateTimeDeidentifier(
             idconfig=self.user_id_config,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="event_date_time",
         )
         events_df_deid, events_ref = events_datetime_deid.transform(
@@ -397,7 +397,7 @@ class TestMultiTableDeidentification(unittest.TestCase):
         orders_df_deid, orders_ref = id_deid.transform(orders_simple, events_ref)
         orders_datetime_deid = DateTimeDeidentifier(
             idconfig=self.user_id_config,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="order_date_time",
         )
         orders_df_deid, orders_ref = orders_datetime_deid.transform(
