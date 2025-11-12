@@ -72,7 +72,7 @@ class TestConfigTutorial(unittest.TestCase):
             clr.IDDeidentifier(idconfig=user_id_config),
             clr.DateTimeDeidentifier(
                 idconfig=user_id_config,
-                deid_config=deid_config,
+                global_deid_config=deid_config,
                 datetime_column="reg_date_time",
             ),
             clr.ColumnDropper(
@@ -174,7 +174,7 @@ class TestConfigTutorial(unittest.TestCase):
             clr.IDDeidentifier(idconfig=user_id_config),
             clr.DateTimeDeidentifier(
                 idconfig=user_id_config,
-                deid_config=deid_config,
+                global_deid_config=deid_config,
                 datetime_column="reg_date_time",
             ),
             clr.ColumnDropper(

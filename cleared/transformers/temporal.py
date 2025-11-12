@@ -20,31 +20,65 @@ from cleared.config.structure import (
 
 
 class DateTimeDeidentifier(FilterableTransformer):
-    """De-identifier for date and time columns using time shifting."""
+    """
+    De-identifier for date and time columns using time shifting.
+
+    This transformer applies time shifts to datetime columns based on reference column values
+    (e.g., patient_id). The same reference value will always receive the same time shift,
+    ensuring consistency across multiple datetime columns for the same entity.
+
+    Null Handling:
+        - Reference column (idconfig.name): Null values are NOT allowed. The transformer
+          will raise a ValueError if any null values are detected in the reference column.
+          This is required because time shifts are keyed by reference values.
+        - Datetime column (datetime_column): Null values ARE preserved. If the datetime
+          column contains null/NaT values, they will remain as null in the output after
+          transformation. The time shift operation does not modify null datetime values.
+
+    Examples:
+        >>> from cleared.config.structure import IdentifierConfig, DeIDConfig, TimeShiftConfig
+        >>> idconfig = IdentifierConfig(name="patient_id", uid="patient_uid")
+        >>> deid_config = DeIDConfig(time_shift=TimeShiftConfig(method="shift_by_days", min=-30, max=30))
+        >>> transformer = DateTimeDeidentifier(
+        ...     idconfig=idconfig,
+        ...     global_deid_config=deid_config,
+        ...     datetime_column="admission_date"
+        ... )
+        >>> # Transform data - nulls in datetime column are preserved
+        >>> result_df, deid_ref = transformer.transform(df, {})
+
+    """
 
     def __init__(
         self,
         idconfig: IdentifierConfig,
-        deid_config: DeIDConfig,
         datetime_column: str,
+        deid_config: DeIDConfig | None = None,
         time_shift_method: str | None = None,
         filter_config: FilterConfig | None = None,
         value_cast: str | None = None,
         uid: str | None = None,
         dependencies: list[str] | None = None,
+        global_deid_config: DeIDConfig | None = None,
     ):
         """
-        De-identify date and time columns using time shifting.
+        Initialize DateTimeDeidentifier.
 
         Args:
             idconfig: Configuration for the reference column used for time shifting
-            deid_config: De-identification configuration
             datetime_column: Name of the datetime column to shift
-            time_shift_method: Name of the time shift method to apply
+            deid_config: De-identification configuration (deprecated, use global_deid_config)
+            time_shift_method: Name of the time shift method to apply (deprecated)
             filter_config: Configuration for filtering operations
             value_cast: Type to cast the de-identification column to
             uid: Unique identifier for the transformer
             dependencies: List of dependency UIDs
+            global_deid_config: Global de-identification configuration (preferred)
+
+        Raises:
+            ValueError: If idconfig is None
+            ValueError: If global_deid_config is None or missing time_shift configuration
+            ValueError: If time_shift method is not supported
 
         """
         super().__init__(
@@ -52,26 +86,38 @@ class DateTimeDeidentifier(FilterableTransformer):
             value_cast=value_cast,
             uid=uid,
             dependencies=dependencies,
+            global_deid_config=global_deid_config,
         )
         self.idconfig = idconfig
-        self.deid_config = deid_config
         self.datetime_column = datetime_column
+
         if self.idconfig is None:
             raise ValueError("idconfig is required for DateTimeDeidentifier")
-        if self.deid_config is None:
-            raise ValueError("deid_config is required for DateTimeDeidentifier")
+
+        # Use global_deid_config from parent (set by engine)
+        # deid_config parameter is kept for backward compatibility but ignored
+        if self.global_deid_config is None:
+            raise ValueError(
+                "global_deid_config is required for DateTimeDeidentifier. "
+                "Ensure the engine passes global_deid_config when instantiating transformers."
+            )
+
+        if self.global_deid_config.time_shift is None:
+            raise ValueError(
+                "time_shift configuration is required in global deid_config for DateTimeDeidentifier"
+            )
 
         # Validate that the time shift method is supported
         if (
-            self.deid_config.time_shift.method
+            self.global_deid_config.time_shift.method
             not in _create_time_shift_gen_map().keys()
         ):
             raise ValueError(
-                f"Unsupported time shift method: {self.deid_config.time_shift.method}"
+                f"Unsupported time shift method: {self.global_deid_config.time_shift.method}"
             )
 
         self.time_shift_generator = create_time_shift_generator(
-            self.deid_config.time_shift
+            self.global_deid_config.time_shift
         )
 
     def _get_column_to_cast(self) -> str | None:
@@ -99,6 +145,32 @@ class DateTimeDeidentifier(FilterableTransformer):
 
         Raises:
             ValueError: If required columns are not found or processing fails
+            ValueError: If the reference column (idconfig.name) contains any null values
+
+        Null Handling:
+            - Reference column (idconfig.name): Null values are NOT allowed. If any null values
+              are present in the reference column, a ValueError is raised. This is because
+              time shifts are applied per reference value, and null values cannot be used as
+              keys for shift mappings.
+            - Datetime column (datetime_column): Null values ARE preserved. If the datetime
+              column contains null values (NaT), they will remain as null in the output.
+              The time shift operation preserves nulls when applying date offsets.
+
+        Examples:
+            >>> # Valid: No nulls in reference column, nulls in datetime are preserved
+            >>> df = pd.DataFrame({
+            ...     "patient_id": [1, 2, 3],
+            ...     "admission_date": [datetime(2023, 1, 1), None, datetime(2023, 1, 3)]
+            ... })
+            >>> result_df, _ = transformer.transform(df, {})
+            >>> # Result: admission_date will have [shifted_date, NaT, shifted_date]
+
+            >>> # Invalid: Nulls in reference column will raise ValueError
+            >>> df = pd.DataFrame({
+            ...     "patient_id": [1, None, 3],
+            ...     "admission_date": [datetime(2023, 1, 1), datetime(2023, 1, 2), datetime(2023, 1, 3)]
+            ... })
+            >>> transformer.transform(df, {})  # Raises ValueError
 
         """
         deid_ref_dict = deid_ref_dict.copy()
@@ -313,6 +385,8 @@ def _create_time_shift_gen_map() -> dict:
         "shift_by_weeks": ShiftByWeeks,
         "shift_by_months": ShiftByMonths,
         "shift_by_years": ShiftByYears,
+        "random_days": ShiftByDays,  # Alias for shift_by_days
+        "random_hours": ShiftByHours,  # Alias for shift_by_hours
     }
     return generator_map
 

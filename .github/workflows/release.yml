@@ -158,7 +158,8 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         run: |
           git add VERSION pyproject.toml CHANGELOG.md
-          git commit -m "chore: bump version to ${{ steps.version_bump.outputs.new_version }}" || echo "No changes to commit"
+          git commit -m "chore: bump version to ${{ steps.version_bump.outputs.new_version }}" \
+            || echo "No changes to commit"
           git push origin HEAD:${{ github.ref_name }} || echo "Nothing to push"
 
       - name: Create and push tag

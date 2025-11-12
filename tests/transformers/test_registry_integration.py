@@ -88,6 +88,7 @@ class TestTransformerRegistryIntegration:
         assert "DateTimeDeidentifier" in registry
 
         # Test instantiation with new config structure
+        from cleared.config.structure import DeIDConfig, TimeShiftConfig
 
         config = DictConfig(
             {
@@ -96,20 +97,15 @@ class TestTransformerRegistryIntegration:
                     "uid": "patient_id",
                     "description": "Patient identifier",
                 },
-                "deid_config": {
-                    "global_uids": {
-                        "patient_id": {
-                            "name": "patient_id",
-                            "uid": "patient_id",
-                            "description": "Patient identifier",
-                        }
-                    },
-                    "time_shift": {"method": "shift_by_days", "min": 1, "max": 30},
-                },
                 "datetime_column": "admission_date",
             }
         )
-        transformer = registry.instantiate("DateTimeDeidentifier", config)
+        # Create global_deid_config separately
+        time_shift_config = TimeShiftConfig(method="shift_by_days", min=1, max=30)
+        global_deid_config = DeIDConfig(time_shift=time_shift_config)
+        transformer = registry.instantiate(
+            "DateTimeDeidentifier", config, global_deid_config=global_deid_config
+        )
 
         assert transformer.datetime_column == "admission_date"
         assert transformer.idconfig.name == "patient_id"

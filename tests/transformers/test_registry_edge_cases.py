@@ -118,9 +118,13 @@ class TestTransformerRegistryEdgeCases:
 
         class NoneAwareTransformer(BaseTransformer):
             def __init__(self, **kwargs):
-                super().__init__()
+                super().__init__(global_deid_config=kwargs.get("global_deid_config"))
                 self.configs = kwargs
-                self.is_none = len(kwargs) == 0
+                # Check if only global_deid_config (which may be None) is present
+                non_global_keys = {
+                    k: v for k, v in kwargs.items() if k != "global_deid_config"
+                }
+                self.is_none = len(non_global_keys) == 0
 
             def transform(
                 self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]

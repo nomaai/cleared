@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pandas as pd
 from cleared.transformers.base import BaseTransformer
-from cleared.config.structure import IdentifierConfig
+from cleared.config.structure import IdentifierConfig, DeIDConfig
 
 
 class ColumnDropper(BaseTransformer):
@@ -15,6 +15,7 @@ class ColumnDropper(BaseTransformer):
         idconfig: IdentifierConfig | dict,
         uid: str | None = None,
         dependencies: list[str] | None = None,
+        global_deid_config: DeIDConfig | None = None,
     ):
         """
         Drop a column from a DataFrame.
@@ -23,9 +24,12 @@ class ColumnDropper(BaseTransformer):
             idconfig (IdentifierConfig or dict): Configuration for the column to drop
             uid (str, optional): Unique identifier for the transformer
             dependencies (list[str], optional): List of dependency UIDs
+            global_deid_config: Global de-identification configuration (optional)
 
         """
-        super().__init__(uid=uid, dependencies=dependencies)
+        super().__init__(
+            uid=uid, dependencies=dependencies, global_deid_config=global_deid_config
+        )
 
         # Handle both IdentifierConfig object and dict
         if isinstance(idconfig, dict):

@@ -46,7 +46,7 @@ class TestQuickstartTutorial(unittest.TestCase):
             clr.IDDeidentifier(idconfig=user_id_config),
             clr.DateTimeDeidentifier(
                 idconfig=user_id_config,
-                deid_config=deid_config,
+                global_deid_config=deid_config,
                 datetime_column="reg_date_time",
             ),
             clr.ColumnDropper(
@@ -154,7 +154,7 @@ class TestQuickstartTutorial(unittest.TestCase):
 
         datetime_deid = clr.DateTimeDeidentifier(
             idconfig=user_id_config,
-            deid_config=deid_config,
+            global_deid_config=deid_config,
             datetime_column="reg_date_time",
         )
         users_df_deid, deid_ref_dict = datetime_deid.transform(

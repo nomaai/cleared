@@ -121,11 +121,6 @@ class TestFilteredDeidentificationIntegration(unittest.TestCase):
                             uid="user_uid",
                             description="User identifier",
                         ),
-                        "deid_config": DeIDConfig(
-                            time_shift=TimeShiftConfig(
-                                method="shift_by_days", min=30, max=90
-                            )
-                        ),
                         "datetime_column": "reg_date_time",
                     },
                 ),
@@ -171,11 +166,6 @@ class TestFilteredDeidentificationIntegration(unittest.TestCase):
                             uid="user_uid",
                             description="User identifier",
                         ),
-                        "deid_config": DeIDConfig(
-                            time_shift=TimeShiftConfig(
-                                method="shift_by_days", min=30, max=90
-                            )
-                        ),
                         "datetime_column": "event_date_time",
                     },
                     filter=FilterConfig(
@@ -191,11 +181,6 @@ class TestFilteredDeidentificationIntegration(unittest.TestCase):
                             name="user_id",
                             uid="user_uid",
                             description="User identifier",
-                        ),
-                        "deid_config": DeIDConfig(
-                            time_shift=TimeShiftConfig(
-                                method="shift_by_days", min=30, max=90
-                            )
                         ),
                         "datetime_column": "event_value",
                     },

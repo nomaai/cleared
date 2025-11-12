@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import numpy as np
 from cleared.transformers.base import FilterableTransformer
-from cleared.config.structure import IdentifierConfig, FilterConfig
+from cleared.config.structure import IdentifierConfig, FilterConfig, DeIDConfig
 
 
 class IDDeidentifier(FilterableTransformer):
@@ -18,6 +18,7 @@ class IDDeidentifier(FilterableTransformer):
         value_cast: str | None = None,
         uid: str | None = None,
         dependencies: list[str] | None = None,
+        global_deid_config: DeIDConfig | None = None,
     ):
         """
         De-identify ID columns in a DataFrame.
@@ -28,6 +29,7 @@ class IDDeidentifier(FilterableTransformer):
             value_cast (str, optional): Type to cast the de-identification column to
             uid (str, optional): Unique identifier for the transformer
             dependencies (list[str], optional): List of dependency UIDs
+            global_deid_config: Global de-identification configuration (optional)
 
         """
         super().__init__(
@@ -35,6 +37,7 @@ class IDDeidentifier(FilterableTransformer):
             value_cast=value_cast,
             uid=uid,
             dependencies=dependencies,
+            global_deid_config=global_deid_config,
         )
 
         # Handle both IdentifierConfig object and dict

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from omegaconf import DictConfig
 from .base import BaseTransformer
+from cleared.config.structure import DeIDConfig
 
 
 def get_expected_transformer_names() -> list[str]:
@@ -179,13 +180,19 @@ class TransformerRegistry:
 
         del self._registry[name]
 
-    def instantiate(self, name: str, configs: DictConfig) -> BaseTransformer:
+    def instantiate(
+        self,
+        name: str,
+        configs: DictConfig,
+        global_deid_config: DeIDConfig | None = None,
+    ) -> BaseTransformer:
         """
         Instantiate a transformer from its name and configuration.
 
         Args:
             name: Name of the transformer to instantiate
             configs: Hydra DictConfig object containing transformer configuration
+            global_deid_config: Global de-identification configuration to pass to transformers
 
         Returns:
             An instance of the requested transformer class
@@ -198,7 +205,7 @@ class TransformerRegistry:
             >>> from omegaconf import DictConfig
             >>> registry = TransformerRegistry()
             >>> config = DictConfig({"column": "patient_id"})
-            >>> transformer = registry.instantiate("IDDeidentifier", config)
+            >>> transformer = registry.instantiate("IDDeidentifier", config, global_deid_config)
 
         """
         if name not in self._registry:
@@ -234,30 +241,21 @@ class TransformerRegistry:
                         **dict(config_dict["idconfig"])
                     )
 
-            # Special handling for transformers that expect DeIDConfig objects
+            # Remove deid_config from config_dict if present (we use global_deid_config instead)
+            # This allows backward compatibility but prevents per-transformer deid_config
             if config_dict is not None and "deid_config" in config_dict:
-                from cleared.config.structure import DeIDConfig, TimeShiftConfig
+                # Remove it - we'll use global_deid_config instead
+                del config_dict["deid_config"]
 
-                # Handle both dict and DictConfig cases
-                if isinstance(config_dict["deid_config"], dict):
-                    deid_data = config_dict["deid_config"]
-                    time_shift_data = deid_data.get("time_shift", {})
-                    time_shift = (
-                        TimeShiftConfig(**time_shift_data) if time_shift_data else None
-                    )
-                    config_dict["deid_config"] = DeIDConfig(time_shift=time_shift)
-                elif hasattr(config_dict["deid_config"], "_content"):
-                    # It's a DictConfig, convert to dict first
-                    deid_data = dict(config_dict["deid_config"])
-                    time_shift_data = deid_data.get("time_shift", {})
-                    time_shift = (
-                        TimeShiftConfig(**time_shift_data) if time_shift_data else None
-                    )
-                    config_dict["deid_config"] = DeIDConfig(time_shift=time_shift)
+            # Add global_deid_config to config_dict if provided
+            if global_deid_config is not None:
+                if config_dict is None:
+                    config_dict = {}
+                config_dict["global_deid_config"] = global_deid_config
 
             # Handle None config case
             if config_dict is None:
-                return transformer_class()
+                return transformer_class(global_deid_config=global_deid_config)
             else:
                 return transformer_class(**config_dict)
         except Exception as e:

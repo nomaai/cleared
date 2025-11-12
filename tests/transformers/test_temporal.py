@@ -165,6 +165,8 @@ class TestTimeShiftGeneratorMap:
             "shift_by_weeks",
             "shift_by_months",
             "shift_by_years",
+            "random_days",  # Alias for shift_by_days
+            "random_hours",  # Alias for shift_by_hours
         }
         assert set(gen_map.keys()) == expected_keys
 
@@ -218,13 +220,13 @@ class TestDateTimeDeidentifier:
         """Test successful initialization."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
             uid="test_uid",
         )
 
         assert transformer.idconfig == self.idconfig
-        assert transformer.deid_config == self.deid_config
+        assert transformer.global_deid_config == self.deid_config
         assert transformer.datetime_column == "datetime_col"
         assert transformer.uid == "test_uid"
         assert isinstance(transformer.time_shift_generator, ShiftByDays)
@@ -233,7 +235,7 @@ class TestDateTimeDeidentifier:
         """Test initialization without uid."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
         )
 
@@ -245,7 +247,7 @@ class TestDateTimeDeidentifier:
         """Test initialization with dependencies."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
             dependencies=["dep1", "dep2"],
         )
@@ -259,17 +261,19 @@ class TestDateTimeDeidentifier:
         ):
             DateTimeDeidentifier(
                 idconfig=None,
-                deid_config=self.deid_config,
+                global_deid_config=self.deid_config,
                 datetime_column="datetime_col",
             )
 
     def test_initialization_none_deid_config(self):
-        """Test initialization with None deid_config raises error."""
+        """Test initialization with None global_deid_config raises error."""
         with pytest.raises(
-            ValueError, match="deid_config is required for DateTimeDeidentifier"
+            ValueError, match="global_deid_config is required for DateTimeDeidentifier"
         ):
             DateTimeDeidentifier(
-                idconfig=self.idconfig, deid_config=None, datetime_column="datetime_col"
+                idconfig=self.idconfig,
+                global_deid_config=None,
+                datetime_column="datetime_col",
             )
 
     def test_initialization_invalid_time_shift_method(self):
@@ -283,7 +287,7 @@ class TestDateTimeDeidentifier:
         """Test _timeshift_key method."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
         )
 
@@ -294,7 +298,7 @@ class TestDateTimeDeidentifier:
         """Test _get_and_update_timeshift_mappings with empty deid_ref_dict."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
         )
 
@@ -327,7 +331,7 @@ class TestDateTimeDeidentifier:
         """Test _get_and_update_timeshift_mappings with existing mappings."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
         )
 
@@ -369,7 +373,7 @@ class TestDateTimeDeidentifier:
         """Test _get_and_update_timeshift_mappings when no new values."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
         )
 
@@ -406,7 +410,7 @@ class TestDateTimeDeidentifier:
         """Test _apply_time_shift with datetime series."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
         )
 
@@ -426,7 +430,7 @@ class TestDateTimeDeidentifier:
         """Test _apply_time_shift with string series (converts to datetime)."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
         )
 
@@ -453,7 +457,7 @@ class TestDateTimeDeidentifier:
         """Test successful transform operation."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
             uid="test_transformer",
         )
@@ -503,7 +507,7 @@ class TestDateTimeDeidentifier:
         """Test transform with missing reference column."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
         )
 
@@ -525,7 +529,7 @@ class TestDateTimeDeidentifier:
         """Test transform when merge fails (some values don't have mappings)."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
         )
 
@@ -561,7 +565,7 @@ class TestDateTimeDeidentifier:
         """Test transform with existing deid_ref_dict."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
             uid="test_transformer",
         )
@@ -619,7 +623,7 @@ class TestDateTimeDeidentifierIntegration:
         """Test end-to-end transform with real time shift generator."""
         transformer = DateTimeDeidentifier(
             idconfig=self.idconfig,
-            deid_config=self.deid_config,
+            global_deid_config=self.deid_config,
             datetime_column="datetime_col",
             uid="test_transformer",
         )
@@ -677,7 +681,7 @@ class TestDateTimeDeidentifierIntegration:
 
             transformer = DateTimeDeidentifier(
                 idconfig=self.idconfig,
-                deid_config=deid_config,
+                global_deid_config=deid_config,
                 datetime_column="datetime_col",
                 uid=f"test_{method}",
             )
@@ -703,7 +707,9 @@ class TestEdgeCases:
         deid_config = DeIDConfig(time_shift=time_shift_config)
 
         transformer = DateTimeDeidentifier(
-            idconfig=idconfig, deid_config=deid_config, datetime_column="datetime_col"
+            idconfig=idconfig,
+            global_deid_config=deid_config,
+            datetime_column="datetime_col",
         )
 
         df = pd.DataFrame(columns=["patient_id", "datetime_col"])
@@ -715,14 +721,16 @@ class TestEdgeCases:
         assert transformer._timeshift_key() in result_deid_ref_dict
         assert len(result_deid_ref_dict[transformer._timeshift_key()]) == 0
 
-    def test_dataframe_with_nulls(self):
-        """Test transform with null values in reference column."""
+    def test_dataframe_with_nulls_in_reference_column(self):
+        """Test transform with null values in reference column raises error."""
         idconfig = IdentifierConfig(name="patient_id", uid="patient_uid")
         time_shift_config = TimeShiftConfig(method="shift_by_days", min=1, max=30)
         deid_config = DeIDConfig(time_shift=time_shift_config)
 
         transformer = DateTimeDeidentifier(
-            idconfig=idconfig, deid_config=deid_config, datetime_column="datetime_col"
+            idconfig=idconfig,
+            global_deid_config=deid_config,
+            datetime_column="datetime_col",
         )
 
         df = pd.DataFrame(
@@ -736,13 +744,177 @@ class TestEdgeCases:
                 ],
             }
         )
-        try:
+        with pytest.raises(
+            ValueError,
+            match=r"Reference column 'patient_id' has null values. Time shift cannot be applied.",
+        ):
             transformer.transform(df, {})
-        except ValueError as e:
-            assert (
-                str(e)
-                == "Reference column 'patient_id' has null values. Time shift cannot be applied. Please ensure all reference values are non-null."
-            )
+
+    def test_dataframe_with_nulls_in_datetime_column(self):
+        """Test transform preserves null values in datetime column."""
+        idconfig = IdentifierConfig(name="patient_id", uid="patient_uid")
+        time_shift_config = TimeShiftConfig(method="shift_by_days", min=1, max=30)
+        deid_config = DeIDConfig(time_shift=time_shift_config)
+
+        transformer = DateTimeDeidentifier(
+            idconfig=idconfig,
+            global_deid_config=deid_config,
+            datetime_column="datetime_col",
+        )
+
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    datetime(2023, 1, 1),
+                    None,  # Null in datetime column
+                    datetime(2023, 1, 3),
+                ],
+            }
+        )
+
+        result_df, _ = transformer.transform(df, {})
+
+        # Check that all rows are preserved
+        assert len(result_df) == len(df)
+
+        # Check that null in datetime column is preserved
+        assert pd.isna(result_df["datetime_col"].iloc[1])
+
+        # Check that non-null values are shifted
+        assert not pd.isna(result_df["datetime_col"].iloc[0])
+        assert not pd.isna(result_df["datetime_col"].iloc[2])
+        assert result_df["datetime_col"].iloc[0] != df["datetime_col"].iloc[0]
+        assert result_df["datetime_col"].iloc[2] != df["datetime_col"].iloc[2]
+
+    def test_dataframe_with_all_nulls_in_datetime_column(self):
+        """Test transform with all null values in datetime column."""
+        idconfig = IdentifierConfig(name="patient_id", uid="patient_uid")
+        time_shift_config = TimeShiftConfig(method="shift_by_days", min=1, max=30)
+        deid_config = DeIDConfig(time_shift=time_shift_config)
+
+        transformer = DateTimeDeidentifier(
+            idconfig=idconfig,
+            global_deid_config=deid_config,
+            datetime_column="datetime_col",
+        )
+
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [None, None, None],  # All nulls
+            }
+        )
+
+        result_df, _ = transformer.transform(df, {})
+
+        # Check that all rows are preserved
+        assert len(result_df) == len(df)
+
+        # Check that all nulls are preserved
+        assert result_df["datetime_col"].isna().all()
+
+    def test_dataframe_with_mixed_nulls_in_datetime_column(self):
+        """Test transform with mixed null and non-null values in datetime column."""
+        idconfig = IdentifierConfig(name="patient_id", uid="patient_uid")
+        time_shift_config = TimeShiftConfig(method="shift_by_days", min=1, max=30)
+        deid_config = DeIDConfig(time_shift=time_shift_config)
+
+        transformer = DateTimeDeidentifier(
+            idconfig=idconfig,
+            global_deid_config=deid_config,
+            datetime_column="datetime_col",
+        )
+
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3, 4, 5],
+                "datetime_col": [
+                    datetime(2023, 1, 1),
+                    None,
+                    datetime(2023, 1, 3),
+                    None,
+                    datetime(2023, 1, 5),
+                ],
+            }
+        )
+
+        result_df, _ = transformer.transform(df, {})
+
+        # Check that all rows are preserved
+        assert len(result_df) == len(df)
+
+        # Check that nulls are preserved at correct positions
+        assert pd.isna(result_df["datetime_col"].iloc[1])
+        assert pd.isna(result_df["datetime_col"].iloc[3])
+
+        # Check that non-null values are shifted
+        assert not pd.isna(result_df["datetime_col"].iloc[0])
+        assert not pd.isna(result_df["datetime_col"].iloc[2])
+        assert not pd.isna(result_df["datetime_col"].iloc[4])
+
+        # Verify null positions match original
+        original_null_mask = df["datetime_col"].isna()
+        result_null_mask = result_df["datetime_col"].isna()
+        pd.testing.assert_series_equal(original_null_mask, result_null_mask)
+
+    def test_dataframe_with_single_null_in_reference_column(self):
+        """Test transform with single null value in reference column raises error."""
+        idconfig = IdentifierConfig(name="patient_id", uid="patient_uid")
+        time_shift_config = TimeShiftConfig(method="shift_by_days", min=1, max=30)
+        deid_config = DeIDConfig(time_shift=time_shift_config)
+
+        transformer = DateTimeDeidentifier(
+            idconfig=idconfig,
+            global_deid_config=deid_config,
+            datetime_column="datetime_col",
+        )
+
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, None, 3],  # Single null in reference
+                "datetime_col": [
+                    datetime(2023, 1, 1),
+                    datetime(2023, 1, 2),
+                    datetime(2023, 1, 3),
+                ],
+            }
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=r"Reference column 'patient_id' has null values. Time shift cannot be applied.",
+        ):
+            transformer.transform(df, {})
+
+    def test_dataframe_with_all_nulls_in_reference_column(self):
+        """Test transform with all null values in reference column raises error."""
+        idconfig = IdentifierConfig(name="patient_id", uid="patient_uid")
+        time_shift_config = TimeShiftConfig(method="shift_by_days", min=1, max=30)
+        deid_config = DeIDConfig(time_shift=time_shift_config)
+
+        transformer = DateTimeDeidentifier(
+            idconfig=idconfig,
+            global_deid_config=deid_config,
+            datetime_column="datetime_col",
+        )
+
+        df = pd.DataFrame(
+            {
+                "patient_id": [None, None, None],  # All nulls in reference
+                "datetime_col": [
+                    datetime(2023, 1, 1),
+                    datetime(2023, 1, 2),
+                    datetime(2023, 1, 3),
+                ],
+            }
+        )
+
+        with pytest.raises(
+            ValueError,
+            match=r"Reference column 'patient_id' has null values. Time shift cannot be applied.",
+        ):
+            transformer.transform(df, {})
 
     def test_single_value_dataframe(self):
         """Test transform with single value DataFrame."""
@@ -751,7 +923,9 @@ class TestEdgeCases:
         deid_config = DeIDConfig(time_shift=time_shift_config)
 
         transformer = DateTimeDeidentifier(
-            idconfig=idconfig, deid_config=deid_config, datetime_column="datetime_col"
+            idconfig=idconfig,
+            global_deid_config=deid_config,
+            datetime_column="datetime_col",
         )
 
         df = pd.DataFrame({"patient_id": [1], "datetime_col": [datetime(2023, 1, 1)]})

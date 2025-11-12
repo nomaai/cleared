@@ -6,10 +6,7 @@ from abc import ABC, abstractmethod
 import pandas as pd
 from uuid import uuid4
 import networkx as nx
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from cleared.config.structure import FilterConfig
+from cleared.config.structure import FilterConfig, DeIDConfig
 
 
 class BaseTask(ABC):  # noqa: B024
@@ -51,16 +48,23 @@ class BaseTask(ABC):  # noqa: B024
 class BaseTransformer(BaseTask):
     """Base transformer class."""
 
-    def __init__(self, uid: str | None = None, dependencies: list[str] | None = None):
+    def __init__(
+        self,
+        uid: str | None = None,
+        dependencies: list[str] | None = None,
+        global_deid_config: DeIDConfig | None = None,
+    ):
         """
         Initialize the base transformer.
 
         Args:
             uid: Unique identifier for the transformer
             dependencies: List of dependency UIDs
+            global_deid_config: Global de-identification configuration (optional)
 
         """
         super().__init__(uid, dependencies)
+        self.global_deid_config = global_deid_config
 
     @abstractmethod
     def transform(
@@ -88,6 +92,7 @@ class FilterableTransformer(BaseTransformer):
         value_cast: str | None = None,
         uid: str | None = None,
         dependencies: list[str] | None = None,
+        global_deid_config: DeIDConfig | None = None,
     ):
         """
         Initialize the filterable transformer.
@@ -97,9 +102,10 @@ class FilterableTransformer(BaseTransformer):
             value_cast: Type to cast the de-identification column to ("integer", "float", "string", "datetime")
             uid: Unique identifier for the transformer
             dependencies: List of dependency UIDs
+            global_deid_config: Global de-identification configuration (optional)
 
         """
-        super().__init__(uid, dependencies)
+        super().__init__(uid, dependencies, global_deid_config)
         self.filter_config = filter_config
         self.value_cast = value_cast
         self._original_index = None
@@ -283,6 +289,7 @@ class Pipeline(BaseTransformer):
         transformers: list[BaseTransformer] | None = None,
         dependencies: list[str] | None = None,
         sequential_execution: bool = True,
+        global_deid_config: DeIDConfig | None = None,
     ):
         """
         Initialize the pipeline.
@@ -292,9 +299,10 @@ class Pipeline(BaseTransformer):
             transformers: List of transformers to add to the pipeline (default is an empty list if None)
             dependencies: List of dependencies of the pipeline (default is an empty list if None)
             sequential_execution: Whether to execute the transformers in sequence (default is True)
+            global_deid_config: Global de-identification configuration (optional)
 
         """
-        super().__init__(uid, dependencies)
+        super().__init__(uid, dependencies, global_deid_config)
         self.__transformers = [] if transformers is None else transformers
         self.sequential_execution = sequential_execution
 

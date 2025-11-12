@@ -562,6 +562,7 @@ class TestClearedEngineInitFromConfig:
                     "description": "Patient ID",
                 }
             },
+            global_deid_config=self.valid_deid_config,
         )
         mock_pipeline_instance.add_transformer.assert_called_once_with(mock_transformer)
 
