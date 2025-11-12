@@ -12,9 +12,10 @@ NOTEBOOK_DIR=${NOTEBOOK_DIR:-"$(pwd)"}
 # Check if jupyter is available
 if ! command -v jupyter &> /dev/null
 then
-    echo "Looks like jupyter is not available. Run the following command to activate the environment:"
+    echo "Looks like jupyter is not available. Run the following command to setup the environment:"
     echo
-    echo "make activate"
+    echo "task setup-env"
+    echo "poetry shell"
     exit
 fi
 
@@ -24,7 +25,9 @@ if [ -f "~/.jupyter/jupyter_server_config.json" ]; then
     echo "Jupyter Lab config file was not generated!"
     echo "First run the following commands to create config and password:"
     echo
-    echo "make install_jupyter"
+    echo "task install-jupyter"
+    echo "poetry run jupyter server --generate-config"
+    echo "poetry run jupyter server password"
     echo 
     exit
 fi
@@ -33,7 +36,7 @@ if [ ${#PASSWORD_STR} -le 5 ]; then
   echo "Jupyter Lab config file existed but password is not set!" ; 
   echo "First run the following commands to create config and password:"
   echo
-  echo "jupyter server password"
+  echo "poetry run jupyter server password"
   echo ""
   exit
 fi

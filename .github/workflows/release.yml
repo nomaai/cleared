@@ -1,0 +1,311 @@
+---
+# Release workflow for cleared project
+# This workflow handles version bumping, tagging, GitHub releases, and PyPI publishing
+name: Release
+
+# Controls when the workflow will run
+on:
+  # Manual trigger with version bump type selection
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+      publish_to_pypi:
+        description: 'Publish to PyPI'
+        required: true
+        type: boolean
+        default: true
+      create_release:
+        description: 'Create GitHub release'
+        required: true
+        type: boolean
+        default: true
+
+  # Also trigger on version tags (v*.*.*) for publishing only
+  push:
+    tags:
+      - 'v*.*.*'
+
+# Environment variables
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Job 1: Prepare release - bump version, run tests, build
+  prepare-release:
+    name: "Prepare Release"
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version_bump.outputs.new_version || steps.version_tag.outputs.new_version }}
+      version_tag: ${{ steps.version_bump.outputs.version_tag || steps.version_tag.outputs.version_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for tags and changelog
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Task runner
+        uses: arduino/setup-task@v1
+        with:
+          version: 3.x
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install OS dependencies
+        run: task install-os-deps
+
+      - name: Install dependencies
+        run: task setup-env
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Get current version
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(cat VERSION)
+          echo "current_version=${CURRENT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Current version: ${CURRENT_VERSION}"
+
+      - name: Bump version
+        id: version_bump
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          BUMP_TYPE="${{ github.event.inputs.version_bump }}"
+          echo "Bumping version: ${BUMP_TYPE}"
+          
+          # Use task to bump version
+          task version-bump "${BUMP_TYPE}"
+          
+          # Get new version
+          NEW_VERSION=$(cat VERSION)
+          VERSION_TAG="v${NEW_VERSION}"
+          
+          echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
+          echo "New version: ${NEW_VERSION}"
+          echo "Version tag: ${VERSION_TAG}"
+
+      - name: Get version from tag (if triggered by tag)
+        id: version_tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION_TAG="${GITHUB_REF#refs/tags/}"
+          NEW_VERSION="${VERSION_TAG#v}"
+          echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Version from tag: ${NEW_VERSION}"
+
+      - name: Run full CI checks
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          echo "Running CI checks before release..."
+          task ci-local
+
+      - name: Generate changelog
+        id: changelog
+        if: github.event_name == 'workflow_dispatch'
+        continue-on-error: true
+        run: |
+          echo "Generating changelog..."
+          task changelog || echo "Changelog generation completed (or no changes to log)"
+          
+          # Read changelog content if it exists
+          if [ -f CHANGELOG.md ]; then
+            CHANGELOG_CONTENT=$(cat CHANGELOG.md)
+            # Use multiline output
+            {
+              echo "changelog<<EOF"
+              echo "${CHANGELOG_CONTENT}"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            echo "changelog=No changelog generated" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build distribution packages
+        run: |
+          echo "Building distribution packages..."
+          task build
+          ls -la dist/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/*
+          retention-days: 7
+
+      - name: Commit version changes
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git add VERSION pyproject.toml CHANGELOG.md
+          git commit -m "chore: bump version to ${{ steps.version_bump.outputs.new_version }}" || echo "No changes to commit"
+          git push origin HEAD:${{ github.ref_name }} || echo "Nothing to push"
+
+      - name: Create and push tag
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'
+        run: |
+          TAG="${{ steps.version_bump.outputs.version_tag }}"
+          echo "Creating tag: ${TAG}"
+          git tag -a "${TAG}" -m "Release ${TAG}"
+          git push origin "${TAG}"
+
+  # Job 2: Create GitHub Release
+  create-release:
+    name: "Create GitHub Release"
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true') ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          TAG="${{ needs.prepare-release.outputs.version_tag }}"
+          
+          # Try to get changelog section for this version
+          if [ -f CHANGELOG.md ]; then
+            # Extract recent changelog entries (first 100 lines usually contain latest)
+            RELEASE_NOTES=$(head -100 CHANGELOG.md)
+          else
+            # Fallback: use git log
+            PREVIOUS_TAG=$(git tag --sort=-creatordate | sed -n 2p)
+            if [ -z "${PREVIOUS_TAG}" ]; then
+              RELEASE_NOTES="## Release ${TAG}
+
+              Initial release or changelog not available."
+            else
+              RELEASE_NOTES=$(git log "${PREVIOUS_TAG}"..HEAD --pretty=format:"- %s (%h)" --no-merges)
+              RELEASE_NOTES="## Release ${TAG}
+
+              ### Changes since ${PREVIOUS_TAG}:
+
+              ${RELEASE_NOTES}"
+            fi
+          fi
+          
+          # Use multiline output
+          {
+            echo "notes<<EOF"
+            echo "${RELEASE_NOTES}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.version_tag }}
+          name: Release ${{ needs.prepare-release.outputs.version_tag }}
+          body: ${{ steps.release_notes.outputs.notes }}
+          files: dist/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Job 3: Publish to PyPI
+  publish-pypi:
+    name: "Publish to PyPI"
+    needs: prepare-release
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_to_pypi == 'true') ||
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    environment:
+      name: pypi
+      url: https://pypi.org/p/cleared
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: Install OS dependencies
+        run: task install-os-deps
+
+      - name: Install dependencies
+        run: task setup-env
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
+
+      - name: Publish to PyPI
+        env:
+          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          echo "Publishing to PyPI..."
+          # Check if packages exist
+          PACKAGES_FOUND=false
+          for file in dist/*.whl dist/*.tar.gz; do
+            if [ -f "${file}" ]; then
+              PACKAGES_FOUND=true
+              break
+            fi
+          done
+          
+          if [ "${PACKAGES_FOUND}" = "false" ]; then
+            echo "Error: No distribution packages found in dist/"
+            exit 1
+          fi
+          
+          # Publish using Poetry (publish command uses dist/ by default)
+          # Poetry will automatically use POETRY_PYPI_TOKEN_PYPI environment variable
+          poetry publish --no-interaction || {
+            echo "Publishing failed. This might be because:"
+            echo "  - The version already exists on PyPI"
+            echo "  - PyPI API token is invalid"
+            echo "  - Network issues"
+            echo ""
+            echo "Check PyPI to verify if the version exists."
+            exit 1
+          }
+          echo "Successfully published to PyPI!"
+

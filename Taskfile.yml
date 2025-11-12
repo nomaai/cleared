@@ -14,7 +14,7 @@
 #   4. task test               # Run tests to ensure everything works
 #
 # PREREQUISITES:
-#   - Python 3.9+ installed
+#   - Python 3.10+ installed
 #   - Git repository cloned
 #   - Terminal/command line access
 #
@@ -138,12 +138,51 @@ tasks:
     cmds:
       - poetry run ruff format
 
+  format-check:
+    desc: >
+      Check code formatting without modifying files (CI-friendly).
+      Fails if code is not properly formatted. Use this in CI pipelines.
+    cmds:
+      - poetry run ruff format --check
+
   test:
     desc: >
       Run all tests using pytest with coverage reporting.
       Executes the full test suite and generates coverage reports. Essential before deploying.
     cmds:
       - poetry run pytest
+
+  test-coverage:
+    desc: >
+      Run tests with coverage reporting and generate HTML report.
+      Generates coverage data and HTML report in htmlcov/. Use test-coverage-report to view.
+    cmds:
+      - echo "Running tests with coverage..."
+      - poetry run pytest --cov=cleared --cov-report=html --cov-report=term
+      - echo "Coverage report generated in htmlcov/index.html"
+
+  test-coverage-report:
+    desc: >
+      Open the HTML coverage report in your default browser.
+      Requires test-coverage to be run first.
+    cmds:
+      - |
+        if [ -f "htmlcov/index.html" ]; then
+          URL="htmlcov/index.html"
+          xdg-open $URL || sensible-browser $URL || x-www-browser $URL || gnome-open $URL || open $URL
+        else
+          echo "Coverage report not found. Run 'task test-coverage' first."
+          exit 1
+        fi
+
+  type-check:
+    desc: >
+      Run code quality checks that may catch type-related issues using ruff.
+      Note: For full static type checking with mypy, add mypy to dev dependencies.
+      This task runs ruff checks which catch some type-related patterns.
+    cmds:
+      - echo "Running code quality checks (ruff)..."
+      - poetry run ruff check
 
   docs:
     desc: >
@@ -160,6 +199,15 @@ tasks:
           echo "Documentation built successfully at site/index.html (CI environment detected, skipping browser opening)"
         fi
 
+  docs-serve:
+    desc: >
+      Serve documentation locally with auto-reload on file changes.
+      Starts MkDocs development server. Access at http://127.0.0.1:8000. Press Ctrl+C to stop.
+    cmds:
+      - echo 'Starting documentation server...'
+      - echo 'Documentation will be available at http://127.0.0.1:8000'
+      - poetry run mkdocs serve
+
   clean:
     desc: >
       Clean build artifacts, cache files, and temporary files.
@@ -167,6 +215,109 @@ tasks:
       Safe to run anytime.
     cmds:
       - ./scripts/clean.sh
+
+  build:
+    desc: >
+      Build distribution packages (wheel and source distribution).
+      Creates dist/ directory with built packages. Run before publishing to PyPI.
+    cmds:
+      - task: verify-deps
+      - echo "Building distribution packages..."
+      - poetry build
+      - echo "Build complete! Packages are in dist/"
+
+  deps-outdated:
+    desc: >
+      List outdated dependencies in the project.
+      Shows which packages have newer versions available.
+    cmds:
+      - task: verify-deps
+      - echo "Checking for outdated dependencies..."
+      - poetry show --outdated || echo "All dependencies are up to date"
+
+  deps-update:
+    desc: >
+      Update all dependencies to their latest compatible versions.
+      Updates poetry.lock file. Review changes before committing.
+    cmds:
+      - task: verify-deps
+      - echo "Updating dependencies..."
+      - poetry update
+      - echo "Dependencies updated! Review poetry.lock before committing."
+
+  version-show:
+    desc: >
+      Display the current project version.
+      Reads version from VERSION file and pyproject.toml.
+    cmds:
+      - echo "Current version from VERSION file:"
+      - cat VERSION
+      - echo ""
+      - echo "Current version from pyproject.toml:"
+      - poetry version --short
+
+  version-bump:
+    desc: >
+      Bump the project version (major, minor, or patch).
+      Usage: task version-bump [major|minor|patch]. Updates both VERSION file and pyproject.toml.
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Usage: task version-bump [major|minor|patch]"
+          echo "Example: task version-bump patch"
+          exit 1
+        fi
+        BUMP_TYPE="{{.CLI_ARGS}}"
+        if [ "$BUMP_TYPE" != "major" ] && [ "$BUMP_TYPE" != "minor" ] && [ "$BUMP_TYPE" != "patch" ]; then
+          echo "Error: Bump type must be 'major', 'minor', or 'patch'"
+          exit 1
+        fi
+        echo "Bumping version ($BUMP_TYPE)..."
+        poetry version $BUMP_TYPE
+        NEW_VERSION=$(poetry version --short)
+        echo "$NEW_VERSION" > VERSION
+        echo "Version bumped to: $NEW_VERSION"
+
+  changelog:
+    desc: >
+      Generate changelog using gitchangelog.
+      Creates CHANGELOG.md from git commit history. Requires gitchangelog to be installed.
+    cmds:
+      - task: verify-deps
+      - echo "Generating changelog..."
+      - poetry run gitchangelog > CHANGELOG.md || echo "Changelog generation completed (or no changes to log)"
+      - echo "Changelog written to CHANGELOG.md"
+
+  ci-local:
+    desc: >
+      Run the full CI pipeline locally (simulate CI environment).
+      Runs lint, format-check, type-check, test, and docs build. Use this before pushing.
+    cmds:
+      - task: verify-deps
+      - task: verify-env-silent
+      - |
+        echo "========================================="
+        echo "Running local CI pipeline..."
+        echo "========================================="
+        echo ""
+        echo "Step 1/5: Running linter..."
+        task lint
+        echo ""
+        echo "Step 2/5: Checking code formatting..."
+        task format-check
+        echo ""
+        echo "Step 3/5: Running type checks..."
+        task type-check
+        echo ""
+        echo "Step 4/5: Running tests..."
+        task test
+        echo ""
+        echo "Step 5/5: Building documentation..."
+        CI=true task docs
+        echo ""
+        echo "========================================="
+        echo "✅ All CI checks passed!"
+        echo "========================================="
 
   install-jupyter:
     desc: >
