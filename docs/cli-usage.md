@@ -12,6 +12,7 @@ The Cleared framework provides a powerful command-line interface (CLI) that allo
   - [`cleared lint`](#cleared-lint)
   - [`cleared init`](#cleared-init)
   - [`cleared setup`](#cleared-setup)
+  - [`cleared describe`](#cleared-describe)
   - [`cleared info`](#cleared-info)
 - [Configuration File Format](#configuration-file-format)
 - [Hydra Integration](#hydra-integration)
@@ -241,6 +242,44 @@ cleared setup config.yaml -o "io.data.input_config.configs.base_path=/custom/pat
 cleared setup config.yaml --verbose
 ```
 
+### `cleared describe`
+
+Generate an HTML report describing the Cleared configuration.
+
+**Usage:**
+```bash
+cleared describe <config.yaml> [OPTIONS]
+```
+
+**Arguments:**
+- `config.yaml` - Path to the configuration file
+
+**Options:**
+- `--config-name`, `-cn` - Name of the configuration to load (default: cleared_config)
+- `--override` - Override configuration values before generating report
+- `--output`, `-o` - Output HTML file path (default: describe.html in current directory)
+- `--verbose`, `-v` - Enable verbose output
+
+**Description:**
+This command loads a configuration file and generates a comprehensive HTML report with all configuration details, including:
+- Overview statistics (table count, transformer count, dependency count)
+- De-identification configuration (time shift method and range)
+- I/O configuration (input/output paths, file formats, storage types)
+- Tables section with detailed transformer information
+- Interactive features (sortable/filterable tables, PDF export)
+
+**Examples:**
+```bash
+# Generate HTML report (saves to describe.html)
+cleared describe config.yaml
+
+# Generate report with custom output path
+cleared describe config.yaml -o report.html
+
+# Generate report with overrides
+cleared describe config.yaml -o report.html --override "name=test" --verbose
+```
+
 ### `cleared info`
 
 Show information about the Cleared framework.
@@ -367,7 +406,12 @@ cleared run config.yaml -o "io.data.input_config.configs.base_path=/input" -o "i
    cleared validate my_project.yaml
    ```
 
-4. **Run the de-identification:**
+4. **Generate a configuration report (optional):**
+   ```bash
+   cleared describe my_project.yaml
+   ```
+
+5. **Run the de-identification:**
    ```bash
    cleared run my_project.yaml --create-dirs
    ```
