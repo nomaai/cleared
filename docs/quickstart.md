@@ -203,6 +203,27 @@ print(f"De-identified shape: {users_df_deid.shape}")
 print(f"Columns: {list(users_df_deid.columns)}")
 ```
 
+## Viewing Configuration Details
+
+Before running your configuration, you can generate a visual HTML report to review all configuration details:
+
+```bash
+# Generate an HTML report of your configuration
+cleared describe config.yaml
+
+# Or specify a custom output file
+cleared describe config.yaml -o my_config_report.html
+```
+
+The report includes:
+- Overview statistics (tables, transformers, dependencies)
+- De-identification configuration details
+- I/O configuration settings
+- Detailed transformer information for each table
+- Interactive features (sorting, filtering, PDF export)
+
+Open the generated HTML file in your browser to view the comprehensive configuration report.
+
 ## Validating Configuration Files
 
 If you're using configuration files (YAML) instead of programmatic setup, you can validate your configuration before running the de-identification process using the `cleared validate` command.
