@@ -270,7 +270,7 @@ def _prepare_config_for_display(config_dict: dict) -> list:
             item["children"] = _prepare_config_for_display(value)
         elif isinstance(value, list):
             # List - check if it contains dicts or simple values
-            if value and isinstance(value[0], dict):
+            if value and len(value) > 0 and isinstance(value[0], dict):
                 item["type"] = "nested_list"
                 item["children"] = [
                     _prepare_config_for_display(v)
