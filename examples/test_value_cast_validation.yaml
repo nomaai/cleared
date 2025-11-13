@@ -1,0 +1,61 @@
+name: "test_value_cast_validation"
+deid_config:
+  time_shift:
+    method: "random_days"
+    min: -365
+    max: 365
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./input"
+        file_format: "csv"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./output"
+        file_format: "csv"
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref"
+  runtime_io_path: "./runtime"
+tables:
+  users:
+    name: "users"
+    depends_on: []
+    transformers:
+      - method: "ColumnDropper"
+        uid: "drop_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "name"
+            uid: "name"
+        value_cast: "string"  # Error: ColumnDropper doesn't support value_cast
+      - method: "IDDeidentifier"
+        uid: "user_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+        value_cast: "datetime"  # Warning: unusual for IDDeidentifier
+      - method: "DateTimeDeidentifier"
+        uid: "datetime_transformer"
+        depends_on: ["user_id_transformer"]
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+          datetime_column: "created_at"
+        value_cast: "integer"  # Warning: unusual for DateTimeDeidentifier
+

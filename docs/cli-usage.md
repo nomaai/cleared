@@ -2,6 +2,33 @@
 
 The Cleared framework provides a powerful command-line interface (CLI) that allows you to run data de-identification processes, validate configurations, and manage projects directly from the terminal.
 
+## Table of Contents
+
+- [Installation](#installation)
+- [Available Commands](#available-commands)
+  - [`cleared run`](#cleared-run)
+  - [`cleared validate`](#cleared-validate)
+  - [`cleared check-syntax`](#cleared-check-syntax)
+  - [`cleared lint`](#cleared-lint)
+  - [`cleared init`](#cleared-init)
+  - [`cleared setup`](#cleared-setup)
+  - [`cleared info`](#cleared-info)
+- [Configuration File Format](#configuration-file-format)
+- [Hydra Integration](#hydra-integration)
+- [Getting Started](#getting-started)
+- [Output and Results](#output-and-results)
+- [Error Handling](#error-handling)
+- [Best Practices](#best-practices)
+- [Advanced Usage](#advanced-usage)
+  - [Custom Transformers](#custom-transformers)
+  - [Batch Processing](#batch-processing)
+  - [Integration with CI/CD](#integration-with-cicd)
+- [Troubleshooting](#troubleshooting)
+  - [Debug Mode](#debug-mode)
+  - [Configuration Validation](#configuration-validation)
+  - [Log Files](#log-files)
+- [Support](#support)
+
 ## Installation
 
 The CLI is automatically available when you install the Cleared package:
@@ -46,7 +73,7 @@ cleared run config.yaml -o "io.data.input_config.configs.base_path=/custom/path"
 
 ### `cleared validate`
 
-Validate a configuration file without running the engine.
+Comprehensively validate a configuration file (runs check-syntax and lint).
 
 **Usage:**
 ```bash
@@ -57,15 +84,102 @@ cleared validate <config.yaml> [OPTIONS]
 - `config.yaml` - Path to the configuration file to validate
 
 **Options:**
+- `--config-name`, `-cn` - Name of the configuration to load (default: cleared_config)
+- `--override`, `-o` - Override configuration values for validation
 - `--check-paths` - Check if required paths exist (default: true)
+- `--yamllint-config` - Path to yamllint configuration file (default: .yamllint)
+- `--strict`, `-s` - Treat warnings as errors
+- `--verbose`, `-v` - Enable verbose output
+
+**Description:**
+This command performs comprehensive validation by:
+1. **Checking configuration syntax** - Verifies the configuration can be loaded and initialized
+2. **Linting the configuration** - Performs YAML syntax checking and Cleared-specific rule validation
 
 **Examples:**
 ```bash
-# Validate configuration
+# Full validation (syntax + lint)
 cleared validate config.yaml
+
+# Validate with strict mode (warnings as errors)
+cleared validate config.yaml --strict
+
+# Validate with overrides
+cleared validate config.yaml -o "name=test" --verbose
 
 # Validate without checking paths
 cleared validate config.yaml --no-check-paths
+```
+
+### `cleared check-syntax`
+
+Check configuration file syntax and structure without running the engine.
+
+**Usage:**
+```bash
+cleared check-syntax <config.yaml> [OPTIONS]
+```
+
+**Arguments:**
+- `config.yaml` - Path to the configuration file to check
+
+**Options:**
+- `--config-name`, `-cn` - Name of the configuration to load (default: cleared_config)
+- `--override`, `-o` - Override configuration values for checking
+- `--check-paths` - Check if required paths exist (default: true)
+
+**Description:**
+This command loads and checks a configuration file to verify it can be loaded and initialized before running the actual de-identification process. It does not perform linting.
+
+**Examples:**
+```bash
+# Check configuration syntax
+cleared check-syntax config.yaml
+
+# Check syntax with overrides
+cleared check-syntax config.yaml -o "name=test"
+
+# Check syntax without checking paths
+cleared check-syntax config.yaml --no-check-paths
+```
+
+### `cleared lint`
+
+Lint a configuration file (YAML syntax + Cleared-specific rules).
+
+**Usage:**
+```bash
+cleared lint <config.yaml> [OPTIONS]
+```
+
+**Arguments:**
+- `config.yaml` - Path to the configuration file to lint
+
+**Options:**
+- `--config-name`, `-cn` - Name of the configuration to load (default: cleared_config)
+- `--override`, `-o` - Override configuration values before linting
+- `--yamllint-config` - Path to yamllint configuration file (default: .yamllint)
+- `--strict`, `-s` - Treat warnings as errors
+- `--verbose`, `-v` - Enable verbose output
+
+**Description:**
+This command performs both YAML syntax/structure linting (using yamllint) and Cleared-specific configuration linting (custom rules). It does not check if the configuration can be loaded or initialized.
+
+For a complete reference of all available linting rules, see the [Linting Rules Reference](linting_rules.md).
+
+**Examples:**
+```bash
+# Lint configuration
+cleared lint config.yaml
+
+# Lint with strict mode
+cleared lint config.yaml --strict
+
+# Lint with custom yamllint config
+cleared lint config.yaml --yamllint-config .custom-yamllint
+
+# Lint with overrides
+cleared lint config.yaml -o "name=test" --verbose
 ```
 
 ### `cleared init`
@@ -95,6 +209,38 @@ cleared init my_project_config.yaml
 cleared init config.yaml --force
 ```
 
+### `cleared setup`
+
+Create project directories based on the configuration file.
+
+**Usage:**
+```bash
+cleared setup <config.yaml> [OPTIONS]
+```
+
+**Arguments:**
+- `config.yaml` - Path to the configuration file
+
+**Options:**
+- `--config-name`, `-cn` - Name of the configuration to load (default: cleared_config)
+- `--override`, `-o` - Override configuration values before creating directories
+- `--verbose`, `-v` - Enable verbose output
+
+**Description:**
+This command reads the configuration file and creates all required directories specified in the IO configuration (input paths, output paths, deid_ref paths, and runtime path). Directories that already exist are skipped.
+
+**Examples:**
+```bash
+# Create all directories from config
+cleared setup config.yaml
+
+# Create directories with overrides
+cleared setup config.yaml -o "io.data.input_config.configs.base_path=/custom/path"
+
+# Verbose output
+cleared setup config.yaml --verbose
+```
+
 ### `cleared info`
 
 Show information about the Cleared framework.
@@ -120,19 +266,8 @@ name: "my_deid_engine"
 
 # De-identification configuration
 deid_config:
-  global_uids:
-    patient_id:
-      name: "patient_id"
-      uid: "patient_id"
-      description: "Patient identifier"
-    encounter_id:
-      name: "encounter_id"
-      uid: "encounter_id"
-      description: "Encounter identifier"
-  
   time_shift:
     method: "random_days"
-    ref_id: "patient_id"
     min: -365
     max: 365
 
@@ -198,7 +333,6 @@ tables:
             name: "patient_id"
             uid: "patient_id"
             description: "Patient identifier for time shifting"
-          time_shift_method: "random_days"
           datetime_column: "admission_date"
 ```
 
@@ -209,7 +343,7 @@ The CLI supports Hydra's powerful configuration override system, allowing you to
 ```bash
 # Override specific configuration values
 cleared run config.yaml -o "io.data.input_config.configs.base_path=/new/path"
-cleared run config.yaml -o "deid_config.global_uids.patient_id.name=custom_patient_id"
+cleared run config.yaml -o "deid_config.time_shift.method=shift_by_years"
 cleared run config.yaml -o "tables.patients.transformers[0].configs.idconfig.name=custom_id"
 
 # Multiple overrides
@@ -295,6 +429,10 @@ cleared run config.yaml --create-dirs
 ```bash
 # Solution: Validate first, then fix issues
 cleared validate config.yaml
+
+# Or check syntax and lint separately
+cleared check-syntax config.yaml
+cleared lint config.yaml
 ```
 
 **Pipeline execution errors:**
@@ -368,7 +506,12 @@ cleared run config.yaml --verbose
 Always validate your configuration before running:
 
 ```bash
-cleared validate config.yaml --check-paths
+# Full validation (recommended)
+cleared validate config.yaml
+
+# Or check syntax and lint separately
+cleared check-syntax config.yaml --check-paths
+cleared lint config.yaml
 ```
 
 ### Log Files

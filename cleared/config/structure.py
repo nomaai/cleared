@@ -6,6 +6,7 @@ This module defines the dataclasses used for configuration throughout the Cleare
 
 from __future__ import annotations
 
+import yaml
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -169,3 +170,7 @@ class ClearedConfig:
     deid_config: DeIDConfig = field(default_factory=DeIDConfig)
     io: ClearedIOConfig = field(default_factory=ClearedIOConfig.default)
     tables: dict[str, TableConfig] = field(default_factory=dict)
+
+    def to_yaml(self) -> str:
+        """Convert the ClearedConfig to a YAML string."""
+        return yaml.dump(self, default_flow_style=False)

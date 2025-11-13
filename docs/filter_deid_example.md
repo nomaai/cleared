@@ -146,11 +146,6 @@ tables:
             name: "user_id"
             uid: "user_uid"
             description: "User identifier"
-          deid_config:
-            time_shift:
-              method: "shift_by_days"
-              min: 30
-              max: 90
           datetime_column: "event_value"
         filter:
           where_condition: "event_name == 'Survey submission date'"

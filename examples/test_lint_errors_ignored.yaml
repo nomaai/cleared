@@ -1,0 +1,53 @@
+name: "test_lint_errors_ignored"
+deid_config:
+  time_shift:
+    method: "random_days"
+    min: 30
+    max: -30  # yamllint disable-line rule:cleared-011
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./input"
+        file_format: "csv"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./output"
+        file_format: "csv"
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref"
+  runtime_io_path: "/tmp/runtime"  # yamllint disable-line rule:cleared-018
+tables:
+  patients:
+    name: "patients"
+    depends_on: []
+    transformers: []  # yamllint disable-line rule:cleared-017
+  encounters:
+    name: "encounters"
+    depends_on: ["non_existent_table"]  # yamllint disable-line rule:cleared-004
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "patient_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "patient_id"
+            uid: "patient_id"
+      - method: "DateTimeDeidentifier"
+        uid: "datetime_transformer"
+        depends_on: ["patient_id_transformer"]
+        configs:
+          idconfig:
+            name: "patient_id"
+            uid: "patient_id"
+          datetime_column: "admission_date"
+

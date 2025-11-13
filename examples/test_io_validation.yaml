@@ -1,0 +1,42 @@
+name: "test_io_validation"
+deid_config:
+  time_shift:
+    method: "random_days"
+    min: -365
+    max: 365
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "/tmp/data"
+        file_format: "invalid_format"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "/tmp/data"
+        file_format: "csv"
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "/tmp/deid_ref"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "/tmp/deid_ref"
+  runtime_io_path: "./runtime"
+tables:
+  users:
+    name: "users"
+    depends_on: []
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+

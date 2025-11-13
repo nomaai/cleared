@@ -1,0 +1,59 @@
+name: "test_dropper_datetime_issue"
+deid_config:
+  time_shift:
+    method: "shift_by_years"
+    min: -5
+    max: 5
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./input"
+        file_format: "csv"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./output"
+        file_format: "csv"
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref"
+  runtime_io_path: "./runtime"
+tables:
+  users:
+    name: "users"
+    depends_on: []
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "user_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+      - method: "ColumnDropper"
+        uid: "drop_datetime"
+        depends_on: ["user_id_transformer"]
+        configs:
+          idconfig:
+            name: "reg_date_time"
+            uid: "datetime_drop"
+            description: "Dropping datetime"
+      - method: "DateTimeDeidentifier"
+        uid: "datetime_transformer"
+        depends_on: ["drop_datetime"]
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+          datetime_column: "reg_date_time"
+

@@ -1,0 +1,50 @@
+name: "test_multiple_transformers"
+deid_config:
+  time_shift:
+    method: "random_days"
+    min: -365
+    max: 365
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./input"
+        file_format: "csv"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./output"
+        file_format: "csv"
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref"
+  runtime_io_path: "./runtime"
+tables:
+  users:
+    name: "users"
+    depends_on: []
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "id_transformer_1"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid_1"
+            description: "User identifier"
+      - method: "IDDeidentifier"
+        uid: "id_transformer_2"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid_2"
+            description: "User identifier"
+

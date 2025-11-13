@@ -2,13 +2,26 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any
-
+import shutil
 import typer
-from hydra.core.global_hydra import GlobalHydra
+import yaml
+
+from cleared.config.structure import (
+    DeIDConfig,
+    ClearedIOConfig,
+    IOConfig,
+    PairedIOConfig,
+    TableConfig,
+    TransformerConfig,
+)
 
 from cleared.config.structure import ClearedConfig
+from cleared.config.structure import TimeShiftConfig
+from io import StringIO
+from pathlib import Path
+from ruamel.yaml import YAML
+from typing import Any
+from hydra.core.global_hydra import GlobalHydra
 
 
 def load_config_from_file(
@@ -31,8 +44,6 @@ def load_config_from_file(
         Exception: If configuration loading fails
 
     """
-    import yaml
-
     # Convert to Path object if it's a string
     config_path = Path(config_path)
     config_dir = config_path.parent
@@ -65,8 +76,6 @@ def _merge_hydra_configs(main_cfg: dict, config_dir: Path) -> dict:
         Merged configuration dictionary
 
     """
-    import yaml
-
     # Start with an empty config
     merged_cfg = {}
 
@@ -116,23 +125,12 @@ def _deep_merge(dict1: dict, dict2: dict) -> dict:
 
 def _hydra_to_cleared_config(cfg: Any) -> ClearedConfig:
     """Convert Hydra config to ClearedConfig object."""
-    from cleared.config.structure import (
-        DeIDConfig,
-        ClearedIOConfig,
-        IOConfig,
-        PairedIOConfig,
-        TableConfig,
-        TransformerConfig,
-    )
-
     # Extract deid_config
     deid_config_data = cfg.get("deid_config", {})
 
     time_shift_data = deid_config_data.get("time_shift")
     time_shift = None
     if time_shift_data:
-        from cleared.config.structure import TimeShiftConfig
-
         # Filter out unsupported fields like 'ref_id' (if any)
         time_shift_dict = {
             k: v for k, v in time_shift_data.items() if k in ["method", "min", "max"]
@@ -207,8 +205,6 @@ def create_sample_config(output_path: Path) -> None:
         output_path: Path where to create the sample configuration
 
     """
-    import shutil
-
     # Get the path to the examples directory
     current_dir = Path(__file__).parent
     examples_dir = current_dir.parent.parent.parent / "examples"
@@ -356,3 +352,112 @@ def cleanup_hydra():
     """Clean up Hydra global state."""
     if GlobalHydra().is_initialized():
         GlobalHydra.instance().clear()
+
+
+def setup_hydra_config_store() -> None:
+    """Set up Hydra configuration store with ClearedConfig."""
+    from hydra.core.config_store import ConfigStore
+
+    cs = ConfigStore.instance()
+    cs.store(name="cleared_config", node=ClearedConfig)
+
+
+def find_imported_yaml_files(config_path: Path) -> set[Path]:
+    """
+    Find all YAML files imported by a configuration file via Hydra defaults.
+
+    This function recursively finds all YAML files that are imported through
+    the 'defaults' mechanism in Hydra-style configurations.
+
+    Args:
+        config_path: Path to the main configuration file
+
+    Returns:
+        Set of Path objects for all imported YAML files (including the main file)
+
+    """
+    config_path = Path(config_path)
+    config_dir = config_path.parent
+    found_files: set[Path] = {config_path}
+    files_to_process: list[Path] = [config_path]
+    processed_files: set[Path] = set()
+
+    while files_to_process:
+        current_file = files_to_process.pop(0)
+
+        if current_file in processed_files:
+            continue
+
+        processed_files.add(current_file)
+
+        if not current_file.exists():
+            continue
+
+        try:
+            with open(current_file) as f:
+                cfg = yaml.safe_load(f)
+
+            if cfg and isinstance(cfg, dict) and "defaults" in cfg:
+                for import_name in cfg.get("defaults", []):
+                    import_file = config_dir / f"{import_name}.yaml"
+
+                    if import_file.exists() and import_file not in found_files:
+                        found_files.add(import_file)
+                        files_to_process.append(import_file)
+        except Exception:
+            # If we can't read the file, skip it
+            continue
+
+    return found_files
+
+
+def format_yaml_file(file_path: Path, check_only: bool = False) -> bool:
+    """
+    Format a YAML file using ruamel.yaml to ensure consistent formatting.
+
+    Args:
+        file_path: Path to the YAML file to format
+        check_only: If True, only check if file needs formatting without modifying it
+
+    Returns:
+        True if file was formatted (or would be formatted in check_only mode),
+        False if file is already properly formatted
+
+    """
+    yaml_obj = YAML()
+    yaml_obj.preserve_quotes = True
+    yaml_obj.width = 120
+    yaml_obj.indent(mapping=2, sequence=4, offset=2)
+
+    try:
+        # Read the file
+        with open(file_path, encoding="utf-8") as f:
+            data = yaml_obj.load(f)
+
+        if data is None:
+            return False
+
+        # Write to a temporary string to check if formatting changed
+        output = StringIO()
+        yaml_obj.dump(data, output)
+        formatted_content = output.getvalue()
+
+        # Read original content
+        with open(file_path, encoding="utf-8") as f:
+            original_content = f.read()
+
+        # Check if formatting is needed
+        if original_content.strip() == formatted_content.strip():
+            return False
+
+        if check_only:
+            return True
+
+        # Write formatted content back to file
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(formatted_content)
+
+        return True
+
+    except Exception as e:
+        raise ValueError(f"Error formatting {file_path}: {e}") from e

@@ -1,0 +1,113 @@
+name: "test_complex_config"
+deid_config:
+  time_shift:
+    method: "random_days"
+    min: -365
+    max: 365
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./input"
+        file_format: "csv"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./output"
+        file_format: "csv"
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./deid_ref"
+  runtime_io_path: "./runtime"
+tables:
+  users:
+    name: "users"
+    depends_on: []
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "user_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+      - method: "DateTimeDeidentifier"
+        uid: "datetime_transformer"
+        depends_on: ["user_id_transformer"]
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+          datetime_column: "created_at"
+      - method: "ColumnDropper"
+        uid: "drop_transformer"
+        depends_on: ["datetime_transformer"]
+        configs:
+          idconfig:
+            name: "name"
+            uid: "name_drop"
+            description: "User name to drop"
+  orders:
+    name: "orders"
+    depends_on: ["users"]
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "order_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "order_id"
+            uid: "order_uid"
+            description: "Order identifier"
+      - method: "DateTimeDeidentifier"
+        uid: "order_datetime_transformer"
+        depends_on: ["order_id_transformer"]
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+          datetime_column: "order_date"
+  events:
+    name: "events"
+    depends_on: ["users"]
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "event_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "event_id"
+            uid: "event_uid"
+            description: "Event identifier"
+      - method: "DateTimeDeidentifier"
+        uid: "event_datetime_transformer"
+        depends_on: ["event_id_transformer"]
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_uid"
+            description: "User identifier"
+          datetime_column: "event_date"
+  products:
+    name: "products"
+    depends_on: []
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "product_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "product_id"
+            uid: "product_uid"
+            description: "Product identifier"
+
