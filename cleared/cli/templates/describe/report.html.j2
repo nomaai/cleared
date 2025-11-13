@@ -1,0 +1,1452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cleared Configuration Report - {{ config_name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/yaml.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        
+        @media print {
+            .no-print { display: none; }
+            .print-break { page-break-after: always; }
+        }
+        
+        :root {
+            --primary: #14204a;
+            --heading: #60a5fa;
+            --info-heading: #000000;
+            --border: #dbeafe;
+            --positive: #dc262699;
+            --negative: #16a34a99;
+            --gray-300: #d1d5db;
+            --gray-600: #4b5563;
+            --secondary: #8592a3;
+            --success: #16a34a;
+            --info: #3b82f6;
+            --warning: #f59e0b;
+            --danger: #dc2626;
+            --dark: #1f2937;
+            --light: #f9fafb;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+            min-height: 100vh;
+        }
+        
+        .badge {
+            @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .badge-primary { 
+            background: var(--primary);
+            color: white;
+        }
+        .badge-success { 
+            background: var(--success);
+            color: white;
+        }
+        .badge-warning { 
+            background: var(--warning);
+            color: white;
+        }
+        .badge-info { 
+            background: var(--info);
+            color: white;
+        }
+        .badge-secondary {
+            background: var(--secondary);
+            color: white;
+        }
+        
+        .card {
+            @apply bg-white rounded-xl shadow-lg border-0;
+            padding: 1.4rem;
+            margin-bottom: 2.5rem;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+            border: 1px solid var(--border);
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card {
+            @apply bg-white rounded-xl shadow-lg border-0;
+            padding: 1.4rem;
+            margin-bottom: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: 1px solid var(--border);
+        }
+        
+        .config-bubble {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin: 0.125rem;
+        }
+        
+        .config-bubble-name {
+            background: rgba(96, 165, 250, 0.15);
+            color: var(--primary);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+        }
+        
+        .config-bubble-value-hardcoded {
+            background: #e5e7eb;
+            color: #374151;
+            border: 1px solid #d1d5db;
+        }
+        
+        .config-bubble-value-reference {
+            background: rgba(96, 165, 250, 0.15);
+            color: var(--info);
+            border: 1px solid rgba(96, 165, 250, 0.3);
+        }
+        
+        .depends-on-bubble {
+            display: inline-block;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 500;
+            background: rgba(219, 234, 254, 0.6);
+            color: var(--primary);
+            border: 1px solid var(--border);
+            margin: 0.125rem;
+        }
+        
+        .config-nested-list {
+            list-style: none;
+            padding-left: 1.5rem;
+            margin: 0.5rem 0;
+        }
+        
+        .config-nested-list li {
+            margin: 0.25rem 0;
+        }
+        
+        .config-nested-list .config-key {
+            font-weight: 600;
+            color: var(--dark);
+        }
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            opacity: 0.1;
+            transform: translate(30px, -30px);
+        }
+        .stat-card.primary::before { background: var(--primary); }
+        .stat-card.success::before { background: var(--success); }
+        .stat-card.warning::before { background: var(--warning); }
+        
+        .section-title {
+            @apply text-2xl font-bold mb-6;
+            color: var(--info-heading);
+            position: relative;
+            padding-bottom: 1rem;
+        }
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 4px;
+            background: var(--heading);
+            border-radius: 2px;
+        }
+        
+        .subsection-title {
+            @apply text-xl font-semibold mb-4 mt-6;
+            color: var(--info-heading);
+        }
+        
+        code {
+            @apply bg-gray-100 px-2 py-1 rounded-md text-sm font-mono;
+            color: #e83e8c;
+            border: 1px solid #e9ecef;
+        }
+        
+        .config-block {
+            @apply bg-gray-50 border border-gray-200 rounded-lg p-4 font-mono text-sm overflow-x-auto;
+            background: #f8f9fa;
+        }
+        
+        .nav-link {
+            @apply block py-3 px-4 rounded-lg transition-all duration-200;
+            color: var(--gray-600);
+            position: relative;
+        }
+        .nav-link:hover {
+            background: rgba(20, 32, 74, 0.1);
+            color: var(--primary);
+            transform: translateX(4px);
+        }
+        .nav-link.active {
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(20, 32, 74, 0.3);
+        }
+        .nav-link.active::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 3px;
+            height: 60%;
+            background: white;
+            border-radius: 0 3px 3px 0;
+        }
+        
+        .io-card {
+            @apply rounded-xl border-0;
+            padding: 1.225rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .io-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+        }
+        .io-card.input::before { background: var(--info); }
+        .io-card.output::before { background: var(--success); }
+        .io-card:hover {
+            transform: translateX(4px);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.1);
+        }
+        
+        .transformer-card {
+            @apply rounded-xl border;
+            padding: 1.225rem;
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            transition: all 0.3s ease;
+            border-color: var(--border);
+        }
+        
+        .depends-on-box {
+            display: inline-block;
+            padding: 0.7rem 1.05rem;
+            border-radius: 0.5rem;
+            background: rgba(219, 234, 254, 0.3);
+            border: 1px solid var(--border);
+            min-height: 2.1rem;
+        }
+        
+        .depends-on-box.has-deps {
+            border-radius: 0.75rem;
+        }
+        
+        .table-text {
+            color: var(--gray-600);
+            font-size: 0.875rem;
+            font-weight: 400;
+        }
+        
+        .table-text-bold {
+            color: var(--dark);
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        .filter-popup {
+            display: none;
+        }
+        
+        .filter-popup.show {
+            display: block;
+        }
+        
+        .filter-toggle-btn {
+            position: relative;
+        }
+        .transformer-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 6px 20px rgba(20, 32, 74, 0.15);
+            transform: translateY(-2px);
+        }
+        
+        .header-gradient {
+            background: linear-gradient(135deg, var(--primary) 0%, #1e3a5f 100%);
+        }
+        
+        .icon-wrapper {
+            @apply inline-flex items-center justify-center w-10 h-10 rounded-lg;
+            background: rgba(20, 32, 74, 0.1);
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header-gradient shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex items-center justify-between">
+                <div class="text-white">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="icon-wrapper bg-white/20 backdrop-blur-sm">
+                            <i class='bx bx-file-blank text-2xl'></i>
+                        </div>
+                        <div>
+                            <h1 class="text-3xl font-bold">Cleared Configuration Report</h1>
+                            <p class="mt-1 text-lg text-white/90 flex items-center gap-2">
+                                <i class='bx bx-cog text-xl'></i>
+                                {{ config_name }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-right text-white/90">
+                    <div class="flex items-center gap-4 mb-3">
+                        <button onclick="downloadPDF()" 
+                                class="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-white/50"
+                                title="Download as PDF">
+                            <i class='bx bx-download text-xl text-white'></i>
+                            <span class="text-sm font-semibold text-white">Download PDF</span>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2 mb-1">
+                        <i class='bx bx-calendar text-lg'></i>
+                        <p class="text-sm font-medium">{{ generated_at }}</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <i class='bx bx-code-alt text-lg'></i>
+                        <p class="text-sm">Cleared v{{ version }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="w-full py-8" style="width: 100%; max-width: 100%; box-sizing: border-box;">
+        <div class="flex flex-col lg:flex-row gap-8 px-4 sm:px-6 lg:px-8" style="width: 100%; max-width: 100%; box-sizing: border-box;">
+            <!-- Sidebar Navigation -->
+            <aside class="lg:w-64 flex-shrink-0 no-print">
+                <nav class="sticky top-8 bg-white rounded-xl shadow-lg border-0" style="padding: 1.75rem; border: 1px solid var(--border);">
+                    <h2 class="text-lg font-bold text-gray-900 mb-5 flex items-center gap-2">
+                        <i class='bx bx-menu text-xl text-primary'></i>
+                        Contents
+                    </h2>
+                    <ul class="space-y-2">
+                        <li>
+                            <a href="#overview" class="nav-link flex items-center gap-3">
+                                <i class='bx bx-bar-chart-alt-2 text-lg'></i>
+                                <span>Overview</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#deid-config" class="nav-link flex items-center gap-3">
+                                <i class='bx bx-shield-alt-2 text-lg'></i>
+                                <span>De-Identification</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#io-config" class="nav-link flex items-center gap-3">
+                                <i class='bx bx-folder text-lg'></i>
+                                <span>I/O Configuration</span>
+                            </a>
+                        </li>
+                        <li>
+                            <a href="#tables" class="nav-link flex items-center gap-3">
+                                <i class='bx bx-table text-lg'></i>
+                                <span>Tables</span>
+                            </a>
+                            {% if tables %}
+                            <ul class="ml-6 mt-2 space-y-1">
+                                {% for table in tables %}
+                                <li>
+                                    <a href="#table-{{ table.key }}" class="nav-link flex items-center gap-2 text-sm py-2">
+                                        <i class='bx bx-chevron-right text-xs'></i>
+                                        <span>{{ table.name }}</span>
+                                    </a>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                            {% endif %}
+                        </li>
+                    </ul>
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <main class="flex-1" style="width: 100%; max-width: 100%; box-sizing: border-box; overflow-x: hidden; min-width: 0;">
+                <!-- Overview Section -->
+                <section id="overview" class="card">
+                    <h2 class="section-title flex items-center gap-3">
+                        <i class='bx bx-bar-chart-alt-2 text-3xl text-primary'></i>
+                        Overview
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="stat-card primary" style="margin-bottom: 0;">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <p class="text-sm font-semibold text-gray-600 mb-1">Total Tables</p>
+                                    <h3 class="text-4xl font-bold text-gray-900">{{ overview.table_count }}</h3>
+                                </div>
+                                <div class="icon-wrapper">
+                                    <i class='bx bx-table text-2xl'></i>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1 text-sm text-gray-500">
+                                <i class='bx bx-info-circle'></i>
+                                <span>Configured tables</span>
+                            </div>
+                        </div>
+                        <div class="stat-card success" style="margin-bottom: 0;">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <p class="text-sm font-semibold text-gray-600 mb-1">Total Transformers</p>
+                                    <h3 class="text-4xl font-bold text-gray-900">{{ overview.transformer_count }}</h3>
+                                </div>
+                                <div class="icon-wrapper">
+                                    <i class='bx bx-cog text-2xl'></i>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1 text-sm text-gray-500">
+                                <i class='bx bx-info-circle'></i>
+                                <span>Active transformers</span>
+                            </div>
+                        </div>
+                        <div class="stat-card warning" style="margin-bottom: 0;">
+                            <div class="flex items-center justify-between mb-4">
+                                <div>
+                                    <p class="text-sm font-semibold text-gray-600 mb-1">Dependencies</p>
+                                    <h3 class="text-4xl font-bold text-gray-900">{{ overview.dependency_count }}</h3>
+                                </div>
+                                <div class="icon-wrapper">
+                                    <i class='bx bx-link text-2xl'></i>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-1 text-sm text-gray-500">
+                                <i class='bx bx-info-circle'></i>
+                                <span>Total dependencies</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- De-Identification Configuration -->
+                <section id="deid-config" class="card">
+                    <h2 class="section-title flex items-center gap-3">
+                        <i class='bx bx-shield-alt-2 text-3xl text-primary'></i>
+                        De-Identification Configuration
+                    </h2>
+                    {% if deid_config.time_shift %}
+                    <div class="flex gap-4" style="padding: 1.225rem; border: 1px solid var(--border); border-radius: 0.75rem; background: white;">
+                        <div class="flex-1" style="border-right: 1px solid var(--border); padding-right: 1rem;">
+                            <div class="flex items-center gap-3 mb-3">
+                                <i class='bx bx-time-five text-2xl' style="color: var(--primary);"></i>
+                                <label class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Time Shift Method</label>
+                            </div>
+                            <div class="mt-2">
+                                <span class="badge badge-primary text-sm px-4 py-2" style="border-radius: 0.75rem;">
+                                    <i class='bx bx-refresh text-base mr-1'></i>
+                                    {{ deid_config.time_shift.method }}
+                                </span>
+                            </div>
+                        </div>
+                        {% if deid_config.time_shift.min is not none and deid_config.time_shift.max is not none %}
+                        <div class="flex-1" style="padding-left: 1rem;">
+                            <div class="flex items-center gap-3 mb-3">
+                                <i class='bx bx-slider text-2xl' style="color: var(--success);"></i>
+                                <label class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Range</label>
+                            </div>
+                            <div class="mt-2 flex items-center gap-3">
+                                <span class="text-2xl font-bold text-gray-900 font-mono">{{ deid_config.time_shift.min }}</span>
+                                <i class='bx bx-right-arrow-alt text-xl text-gray-400'></i>
+                                <span class="text-2xl font-bold text-gray-900 font-mono">{{ deid_config.time_shift.max }}</span>
+                                {% if deid_config.time_shift.min < 0 and deid_config.time_shift.max < 0 %}
+                                <span class="badge badge-warning ml-3">
+                                    <i class='bx bx-error-circle text-xs mr-1'></i>
+                                    All negative
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="flex-1" style="padding-left: 1rem;">
+                            <div class="flex items-center gap-3 mb-3">
+                                <i class='bx bx-slider text-2xl' style="color: var(--success);"></i>
+                                <label class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Range</label>
+                            </div>
+                            <div class="mt-2">
+                                <span class="text-sm text-gray-500 italic">Not specified</span>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% else %}
+                    <div class="bg-gray-50 rounded-xl text-center" style="padding: 1.4rem; border: 1px solid var(--border);">
+                        <i class='bx bx-info-circle text-4xl text-gray-400 mb-3'></i>
+                        <p class="text-gray-500 italic">No time shift configuration defined.</p>
+                    </div>
+                    {% endif %}
+                </section>
+
+                <!-- I/O Configuration -->
+                <section id="io-config" class="card">
+                    <h2 class="section-title flex items-center gap-3">
+                        <i class='bx bx-folder text-3xl text-primary'></i>
+                        I/O Configuration
+                    </h2>
+                    
+                    <h3 class="subsection-title flex items-center gap-2">
+                        <i class='bx bx-data text-xl text-primary'></i>
+                        Data I/O
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div class="io-card input bg-white">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="icon-wrapper">
+                                    <i class='bx bx-download text-xl'></i>
+                                </div>
+                                <div class="text-sm font-bold text-gray-700 uppercase tracking-wide">Input</div>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-600">Type:</span>
+                                    <span class="badge badge-info" style="background: #2563eb; border-radius: 0.75rem; padding: 0.5rem 1rem;">{{ io_config.data.input_config.io_type }}</span>
+                                </div>
+                                {% if io_config.data.input_config.configs.base_path %}
+                                <div>
+                                    <span class="text-sm font-medium text-gray-600 block mb-1">Path:</span>
+                                    <code class="block text-xs break-all">{{ io_config.data.input_config.configs.base_path }}</code>
+                                </div>
+                                {% endif %}
+                                {% if io_config.data.input_config.suffix %}
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-600">Suffix:</span>
+                                    <code>{{ io_config.data.input_config.suffix }}</code>
+                                </div>
+                                {% endif %}
+                                {% if io_config.data.input_config.configs.file_format %}
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-600">Format:</span>
+                                    <code>{{ io_config.data.input_config.configs.file_format }}</code>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="io-card output bg-white">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="icon-wrapper">
+                                    <i class='bx bx-upload text-xl'></i>
+                                </div>
+                                <div class="text-sm font-bold text-gray-700 uppercase tracking-wide">Output</div>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-600">Type:</span>
+                                    <span class="badge badge-success" style="background: #059669; border-radius: 0.75rem; padding: 0.5rem 1rem;">{{ io_config.data.output_config.io_type }}</span>
+                                </div>
+                                {% if io_config.data.output_config.configs.base_path %}
+                                <div>
+                                    <span class="text-sm font-medium text-gray-600 block mb-1">Path:</span>
+                                    <code class="block text-xs break-all">{{ io_config.data.output_config.configs.base_path }}</code>
+                                </div>
+                                {% endif %}
+                                {% if io_config.data.output_config.suffix %}
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-600">Suffix:</span>
+                                    <code>{{ io_config.data.output_config.suffix }}</code>
+                                </div>
+                                {% endif %}
+                                {% if io_config.data.output_config.configs.file_format %}
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-600">Format:</span>
+                                    <code>{{ io_config.data.output_config.configs.file_format }}</code>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="subsection-title flex items-center gap-2">
+                        <i class='bx bx-key text-xl text-primary'></i>
+                        DeID Reference I/O
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        {% if io_config.deid_ref.input_config %}
+                        <div class="io-card input bg-white">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="icon-wrapper">
+                                    <i class='bx bx-download text-xl'></i>
+                                </div>
+                                <div class="text-sm font-bold text-gray-700 uppercase tracking-wide">Input</div>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-600">Type:</span>
+                                    <span class="badge badge-primary" style="background: #1e40af; border-radius: 0.75rem; padding: 0.5rem 1rem;">{{ io_config.deid_ref.input_config.io_type }}</span>
+                                </div>
+                                {% if io_config.deid_ref.input_config.suffix %}
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-600">Suffix:</span>
+                                    <code>{{ io_config.deid_ref.input_config.suffix }}</code>
+                                </div>
+                                {% endif %}
+                                {% if io_config.deid_ref.input_config.configs.base_path %}
+                                <div>
+                                    <span class="text-sm font-medium text-gray-600 block mb-1">Path:</span>
+                                    <code class="block text-xs break-all">{{ io_config.deid_ref.input_config.configs.base_path }}</code>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="io-card bg-white" style="border: 1px solid var(--border);">
+                            <div class="flex items-center gap-3 mb-4">
+                                <i class='bx bx-download text-xl'></i>
+                                <div class="text-sm font-bold text-gray-500 uppercase tracking-wide">Input</div>
+                            </div>
+                            <p class="text-gray-500 italic text-sm">Not configured</p>
+                        </div>
+                        {% endif %}
+                        <div class="io-card output bg-white">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="icon-wrapper">
+                                    <i class='bx bx-upload text-xl'></i>
+                                </div>
+                                <div class="text-sm font-bold text-gray-700 uppercase tracking-wide">Output</div>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-600">Type:</span>
+                                    <span class="badge badge-success" style="background: #059669; border-radius: 0.75rem; padding: 0.5rem 1rem;">{{ io_config.deid_ref.output_config.io_type }}</span>
+                                </div>
+                                {% if io_config.deid_ref.output_config.suffix %}
+                                <div class="flex items-center justify-between">
+                                    <span class="text-sm font-medium text-gray-600">Suffix:</span>
+                                    <code>{{ io_config.deid_ref.output_config.suffix }}</code>
+                                </div>
+                                {% endif %}
+                                {% if io_config.deid_ref.output_config.configs.base_path %}
+                                <div>
+                                    <span class="text-sm font-medium text-gray-600 block mb-1">Path:</span>
+                                    <code class="block text-xs break-all">{{ io_config.deid_ref.output_config.configs.base_path }}</code>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3 class="subsection-title flex items-center gap-2">
+                        <i class='bx bx-play-circle text-xl' style="color: var(--primary);"></i>
+                        Runtime
+                    </h3>
+                    <div class="bg-white rounded-xl" style="padding: 1.225rem; border: 1px solid var(--border);">
+                        <div class="flex items-center gap-3">
+                            <i class='bx bx-play-circle text-2xl'></i>
+                            <div>
+                                <span class="text-sm font-semibold text-gray-600 block mb-1">Runtime Path:</span>
+                                <code class="text-sm">{{ io_config.runtime_path }}</code>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Tables Section -->
+                <section id="tables" class="card">
+                    <h2 class="section-title flex items-center gap-3">
+                        <i class='bx bx-table text-3xl text-primary'></i>
+                        Tables
+                    </h2>
+                    {% macro render_config_item(item, depth=0) %}
+                        {% if item.type == 'nested' %}
+                        <div class="mb-2">
+                            <span class="config-key font-semibold">{{ item.key }}:</span>
+                            <ul class="config-nested-list">
+                                {% for child in item.children %}
+                                <li>{{ render_config_item(child, depth + 1) }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% elif item.type == 'nested_list' %}
+                        <div class="mb-2">
+                            <span class="config-key font-semibold">{{ item.key }}:</span>
+                            <ul class="config-nested-list">
+                                {% for child_list in item.children %}
+                                <li>
+                                    {% if child_list|length == 1 and child_list[0].key is none %}
+                                    <span class="config-bubble config-bubble-value-{{ child_list[0].type }}">{{ child_list[0].value }}</span>
+                                    {% else %}
+                                    <ul class="config-nested-list">
+                                        {% for child in child_list %}
+                                        <li>{{ render_config_item(child, depth + 1) }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                    {% endif %}
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        {% elif item.type == 'list' %}
+                        <div class="mb-1">
+                            <span class="config-bubble config-bubble-name">{{ item.key }}:</span>
+                            {% for val in item.value %}
+                            {% set val_type = 'hardcoded' if (val is number or val is boolean or (val is string and val|upper == val)) else 'reference' %}
+                            <span class="config-bubble config-bubble-value-{{ val_type }}">{{ val }}</span>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="mb-1">
+                            <span class="config-bubble config-bubble-name">{{ item.key }}:</span>
+                            <span class="config-bubble config-bubble-value-{{ item.type }}">{{ item.value }}</span>
+                        </div>
+                        {% endif %}
+                    {% endmacro %}
+                    {% for table in tables %}
+                    <div id="table-{{ table.key }}" class="mb-10 pb-10 border-b-2 border-gray-100 last:border-b-0 last:pb-0 last:mb-0">
+                        <div class="flex items-center justify-between mb-5">
+                            <div class="flex items-center gap-3">
+                                <div class="icon-wrapper">
+                                    <i class='bx bx-table text-xl'></i>
+                                </div>
+                                <h3 class="text-2xl font-bold text-gray-900">{{ table.name }}</h3>
+                            </div>
+                            {% if table.key != table.name %}
+                            <span class="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-lg">
+                                Key: <code class="text-primary font-semibold">{{ table.key }}</code>
+                            </span>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-5 depends-on-box{% if table.depends_on %} has-deps{% endif %}" style="padding: 1.05rem; width: 100%; display: block;">
+                            <span class="table-text-bold">Depends on:</span>
+                            {% if table.depends_on %}
+                            <span class="ml-2">
+                                {% for dep in table.depends_on %}
+                                <span class="depends-on-bubble">{{ dep }}</span>
+                                {% endfor %}
+                            </span>
+                            {% else %}
+                            <span class="table-text italic ml-2">None</span>
+                            {% endif %}
+                        </div>
+
+                        {% if table.transformers %}
+                        <div class="mb-4 flex justify-end relative">
+                            <button class="filter-toggle-btn flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary" 
+                                    data-table-key="{{ table.key }}"
+                                    onclick="toggleFilterPopup('{{ table.key }}')">
+                                <i class='bx bx-filter text-lg text-gray-600'></i>
+                                <span class="text-sm font-semibold text-gray-700">Filter</span>
+                            </button>
+                            
+                            <!-- Filter Popup Menu -->
+                            <div id="filter-popup-{{ table.key }}" 
+                                 class="filter-popup absolute z-50 bg-white rounded-xl shadow-lg border border-gray-200 p-6"
+                                 style="min-width: 400px; max-width: 500px; top: 100%; right: 0; margin-top: 0.5rem; display: none;">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h4 class="text-lg font-semibold text-gray-900">Filter Transformers</h4>
+                                    <button onclick="toggleFilterPopup('{{ table.key }}')" 
+                                            class="text-gray-400 hover:text-gray-600 transition-colors">
+                                        <i class='bx bx-x text-2xl'></i>
+                                    </button>
+                                </div>
+                                <div class="space-y-4">
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Filter by Column:</label>
+                                        <input type="text" 
+                                               class="filter-column-input w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" 
+                                               placeholder="Type to filter columns..."
+                                               data-table-key="{{ table.key }}">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-semibold text-gray-700 mb-2">Filter by Transformer Name:</label>
+                                        <input type="text" 
+                                               class="filter-name-input w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary" 
+                                               placeholder="Type to filter transformer names..."
+                                               data-table-key="{{ table.key }}">
+                                    </div>
+                                    <div class="flex justify-end gap-2 pt-2">
+                                        <button onclick="clearFilters('{{ table.key }}')" 
+                                                class="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors">
+                                            Clear
+                                        </button>
+                                        <button onclick="toggleFilterPopup('{{ table.key }}')" 
+                                                class="px-4 py-2 text-sm font-semibold text-white bg-primary rounded-lg hover:opacity-90 transition-colors">
+                                            Done
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="overflow-x-auto" style="width: 100%; max-width: 100%; box-sizing: border-box;">
+                            <table class="w-full border-collapse transformer-table" data-table-key="{{ table.key }}" style="border: 1px solid var(--border); width: 100%; max-width: 100%; table-layout: fixed; box-sizing: border-box;">
+                                <thead>
+                                    <tr class="bg-gray-50">
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors sortable" 
+                                            data-column="column" 
+                                            data-table-key="{{ table.key }}"
+                                            style="border: 1px solid var(--border); width: 20%;">
+                                            <div class="flex items-center gap-2">
+                                                Column
+                                                <i class='bx bx-sort text-sm text-gray-400 sort-icon'></i>
+                                            </div>
+                                        </th>
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors sortable" 
+                                            data-column="name" 
+                                            data-table-key="{{ table.key }}"
+                                            style="border: 1px solid var(--border); width: 20%;">
+                                            <div class="flex items-center gap-2">
+                                                Transformer Name
+                                                <i class='bx bx-sort text-sm text-gray-400 sort-icon'></i>
+                                            </div>
+                                        </th>
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-700" style="border: 1px solid var(--border); width: 20%;">Depends On</th>
+                                        <th class="text-left py-3 px-4 font-semibold text-gray-700" style="border: 1px solid var(--border); width: 40%;">Configs</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for transformer in table.transformers %}
+                                    <tr class="hover:bg-gray-50 transition-colors transformer-row" 
+                                        data-column="{{ transformer.column_name or '' }}" 
+                                        data-name="{{ transformer.method }} {{ transformer.uid or '' }}">
+                                        <td class="py-4 px-4" style="border: 1px solid var(--border);">
+                                            {% if transformer.column_name %}
+                                            <span class="table-text">{{ transformer.column_name }}</span>
+                                            {% else %}
+                                            <span class="table-text italic">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="py-4 px-4" style="border: 1px solid var(--border);">
+                                            <div class="flex flex-col">
+                                                <span class="table-text-bold">{{ transformer.method }}</span>
+                                                {% if transformer.uid %}
+                                                <span class="table-text mt-1">{{ transformer.uid }}</span>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                        <td class="py-4 px-4" style="border: 1px solid var(--border);">
+                                            {% if transformer.depends_on %}
+                                            <span class="table-text">{{ transformer.depends_on|join(', ') }}</span>
+                                            {% else %}
+                                            <span class="table-text italic">—</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="py-4 px-4" style="border: 1px solid var(--border);">
+                                            {% if transformer.configs %}
+                                            <pre><code class="language-yaml">{{ transformer.configs_formatted }}</code></pre>
+                                            {% else %}
+                                            <span class="table-text italic">—</span>
+                                            {% endif %}
+                                            {% if transformer.value_cast %}
+                                            <div class="mt-2">
+                                                <span class="text-xs font-semibold text-gray-600">Value Cast:</span>
+                                                <code class="text-xs ml-1">{{ transformer.value_cast }}</code>
+                                            </div>
+                                            {% endif %}
+                                            {% if transformer.filter %}
+                                            <div class="mt-2">
+                                                <span class="text-xs font-semibold text-gray-600">Filter:</span>
+                                                <code class="text-xs ml-1 block break-all">{{ transformer.filter.where_condition }}</code>
+                                                {% if transformer.filter.description %}
+                                                <span class="text-xs text-gray-500 italic block mt-1">{{ transformer.filter.description }}</span>
+                                                {% endif %}
+                                            </div>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="bg-gray-50 rounded-xl text-center" style="padding: 1.4rem; border: 1px solid var(--border);">
+                            <i class='bx bx-info-circle text-4xl text-gray-400 mb-3'></i>
+                            <p class="text-gray-500 italic">No transformers configured for this table.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t-2 border-gray-100 mt-12 py-8 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2" style="color: var(--gray-600);">
+                    <i class='bx bx-code-alt text-xl'></i>
+                    <p class="text-sm">Generated by <a href="https://github.com/nomaai/cleared" style="color: var(--primary);" class="font-semibold hover:underline">Cleared</a> v{{ version }}</p>
+                </div>
+                <div class="flex items-center gap-4 text-sm text-gray-500">
+                    <span class="flex items-center gap-1">
+                        <i class='bx bx-calendar'></i>
+                        {{ generated_at }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+
+        // Highlight active nav link on scroll
+        const sections = document.querySelectorAll('section[id]');
+        const navLinks = document.querySelectorAll('.nav-link');
+
+        window.addEventListener('scroll', () => {
+            let current = '';
+            sections.forEach(section => {
+                const sectionTop = section.offsetTop;
+                const sectionHeight = section.clientHeight;
+                if (window.pageYOffset >= sectionTop - 100) {
+                    current = section.getAttribute('id');
+                }
+            });
+
+            navLinks.forEach(link => {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === `#${current}`) {
+                    link.classList.add('active');
+                }
+            });
+        });
+        
+        // Initialize syntax highlighting for YAML code blocks
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('pre code.language-yaml').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+            
+            // Initialize table sorting and filtering
+            initializeTableFilters();
+            initializeTableSorting();
+        });
+        
+        // Download PDF function
+        function downloadPDF() {
+            // Hide the sidebar and filter buttons before generating PDF
+            const sidebar = document.querySelector('aside.no-print');
+            const filterButtons = document.querySelectorAll('.filter-toggle-btn');
+            const originalSidebarDisplay = sidebar ? sidebar.style.display : '';
+            const originalFilterDisplays = Array.from(filterButtons).map(btn => btn.style.display);
+            
+            // Hide sidebar and filter buttons
+            if (sidebar) {
+                sidebar.style.display = 'none';
+            }
+            filterButtons.forEach(btn => {
+                btn.style.display = 'none';
+            });
+            
+            // Get the main content area (everything except sidebar)
+            const element = document.querySelector('main');
+            
+            if (!element) {
+                alert('Error: Could not find content to export');
+                // Restore visibility
+                if (sidebar) sidebar.style.display = originalSidebarDisplay;
+                filterButtons.forEach((btn, idx) => {
+                    btn.style.display = originalFilterDisplays[idx];
+                });
+                return;
+            }
+            
+            // Add temporary CSS to make tables responsive and reduce sizes for PDF
+            const style = document.createElement('style');
+            style.id = 'pdf-table-style';
+            style.textContent = `
+                * {
+                    font-size: 0.85em !important;
+                }
+                .stat-card h3 {
+                    font-size: 3rem !important;
+                }
+                h1, h2, h3, h4, h5, h6 {
+                    font-size: 0.9em !important;
+                    margin-top: 0.5em !important;
+                    margin-bottom: 0.5em !important;
+                }
+                .card, .stat-card, .io-card {
+                    padding: 0.6rem !important;
+                    margin-bottom: 0.8rem !important;
+                }
+                .section-title {
+                    font-size: 1.2em !important;
+                    margin-bottom: 0.6rem !important;
+                }
+                .subsection-title {
+                    font-size: 1em !important;
+                    margin-bottom: 0.4rem !important;
+                }
+                .transformer-table {
+                    width: 100% !important;
+                    max-width: 100% !important;
+                    table-layout: fixed !important;
+                    font-size: 0.65rem !important;
+                }
+                .transformer-table th:nth-child(1),
+                .transformer-table td:nth-child(1) {
+                    width: 20% !important;
+                }
+                .transformer-table th:nth-child(2),
+                .transformer-table td:nth-child(2) {
+                    width: 20% !important;
+                }
+                .transformer-table th:nth-child(3),
+                .transformer-table td:nth-child(3) {
+                    width: 20% !important;
+                }
+                .transformer-table th:nth-child(4),
+                .transformer-table td:nth-child(4) {
+                    width: 40% !important;
+                }
+                .transformer-table th,
+                .transformer-table td {
+                    word-wrap: break-word !important;
+                    overflow-wrap: break-word !important;
+                    max-width: 0 !important;
+                    padding: 0.25rem 0.2rem !important;
+                    font-size: 0.65rem !important;
+                }
+                .transformer-table tr {
+                    height: auto !important;
+                    min-height: 0 !important;
+                }
+                .transformer-table pre {
+                    max-width: 100% !important;
+                    overflow: hidden !important;
+                    padding: 0.4rem !important;
+                    margin: 0 !important;
+                }
+                .transformer-table code {
+                    white-space: pre-wrap !important;
+                    word-wrap: break-word !important;
+                    max-width: 100% !important;
+                    font-size: 0.55rem !important;
+                }
+                .badge {
+                    padding: 0.15rem 0.3rem !important;
+                    font-size: 0.7rem !important;
+                }
+                .depends-on-box {
+                    padding: 0.3rem 0.5rem !important;
+                    font-size: 0.7rem !important;
+                    min-height: auto !important;
+                }
+                .depends-on-bubble {
+                    padding: 0.1rem 0.25rem !important;
+                    font-size: 0.6rem !important;
+                }
+                p, span, div {
+                    margin: 0.2rem 0 !important;
+                }
+                .space-y-3 > * + * {
+                    margin-top: 0.4rem !important;
+                }
+                .space-y-4 > * + * {
+                    margin-top: 0.5rem !important;
+                }
+                .mb-4, .mb-5, .mb-6, .mb-8 {
+                    margin-bottom: 0.6rem !important;
+                }
+                .mt-2, .mt-3, .mt-4 {
+                    margin-top: 0.3rem !important;
+                }
+                .gap-2, .gap-3, .gap-4, .gap-6 {
+                    gap: 0.3rem !important;
+                }
+                #deid-config .card {
+                    padding: 0.5rem !important;
+                }
+                #deid-config > div[style*="padding"] {
+                    padding: 0.5rem !important;
+                }
+                #deid-config .flex-1 {
+                    padding: 0.3rem !important;
+                }
+                #deid-config .flex-1[style*="padding"] {
+                    padding: 0.3rem !important;
+                }
+                #deid-config .badge {
+                    padding: 0.15rem 0.3rem !important;
+                    font-size: 0.65rem !important;
+                }
+                #deid-config .flex {
+                    gap: 0.3rem !important;
+                }
+                #deid-config .mb-3, #deid-config .mb-4 {
+                    margin-bottom: 0.3rem !important;
+                }
+                #deid-config .mt-2 {
+                    margin-top: 0.2rem !important;
+                }
+                #deid-config .space-y-3 > * + * {
+                    margin-top: 0.3rem !important;
+                }
+                #deid-config .space-y-6 > * + * {
+                    margin-top: 0.4rem !important;
+                }
+                #deid-config div[style*="padding: 1.225rem"] {
+                    padding: 0.5rem !important;
+                }
+                #deid-config div[style*="padding-right: 1rem"] {
+                    padding-right: 0.5rem !important;
+                }
+                #deid-config div[style*="padding-left: 1rem"] {
+                    padding-left: 0.5rem !important;
+                }
+                #deid-config .text-2xl {
+                    font-size: 1.2rem !important;
+                }
+                #deid-config .text-xl {
+                    font-size: 1rem !important;
+                }
+            `;
+            document.head.appendChild(style);
+            
+            // Get all tables and make them fit
+            const tables = document.querySelectorAll('.transformer-table');
+            const originalTableStyles = [];
+            
+            tables.forEach(table => {
+                // Store original styles
+                originalTableStyles.push({
+                    element: table,
+                    width: table.style.width,
+                    maxWidth: table.style.maxWidth,
+                    fontSize: table.style.fontSize
+                });
+                
+                // Set responsive styles - make tables fit container
+                table.style.width = '100%';
+                table.style.maxWidth = '100%';
+                table.style.fontSize = '0.75rem';
+                
+                // Adjust table cells
+                const cells = table.querySelectorAll('th, td');
+                cells.forEach(cell => {
+                    cell.style.padding = '0.4rem 0.3rem';
+                    cell.style.fontSize = '0.75rem';
+                });
+                
+                // Adjust code blocks in tables
+                const codeBlocks = table.querySelectorAll('pre code');
+                codeBlocks.forEach(code => {
+                    code.style.fontSize = '0.65rem';
+                });
+            });
+            
+            // Wait a bit for styles to apply
+            setTimeout(() => {
+                // Configure PDF options
+                const opt = {
+                    margin: [0.3, 0.3, 0.3, 0.3],
+                    filename: 'cleared-config-report-{{ config_name }}.pdf',
+                    image: { type: 'jpeg', quality: 0.95 },
+                    html2canvas: { 
+                        scale: 1.5,
+                        useCORS: true,
+                        logging: false,
+                        backgroundColor: '#ffffff',
+                        allowTaint: true
+                    },
+                    jsPDF: { 
+                        unit: 'in', 
+                        format: 'letter', 
+                        orientation: 'portrait',
+                        compress: true
+                    },
+                    pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+                };
+                
+                // Generate and download PDF
+                html2pdf().set(opt).from(element).save().then(() => {
+                    // Remove temporary style
+                    const pdfStyle = document.getElementById('pdf-table-style');
+                    if (pdfStyle) {
+                        document.head.removeChild(pdfStyle);
+                    }
+                    
+                    // Restore table styles
+                    originalTableStyles.forEach(({ element: table, width, maxWidth, fontSize }) => {
+                        table.style.width = width;
+                        table.style.maxWidth = maxWidth;
+                        table.style.fontSize = fontSize;
+                        
+                        // Restore cell styles
+                        const cells = table.querySelectorAll('th, td');
+                        cells.forEach(cell => {
+                            cell.style.padding = '';
+                            cell.style.fontSize = '';
+                        });
+                        
+                        // Restore code block styles
+                        const codeBlocks = table.querySelectorAll('pre code');
+                        codeBlocks.forEach(code => {
+                            code.style.fontSize = '';
+                        });
+                    });
+                    
+                    // Restore visibility
+                    if (sidebar) {
+                        sidebar.style.display = originalSidebarDisplay;
+                    }
+                    filterButtons.forEach((btn, idx) => {
+                        btn.style.display = originalFilterDisplays[idx];
+                    });
+                }).catch((error) => {
+                    console.error('Error generating PDF:', error);
+                    alert('Error generating PDF. Please try again.');
+                    
+                    // Remove temporary style
+                    const pdfStyle = document.getElementById('pdf-table-style');
+                    if (pdfStyle) {
+                        document.head.removeChild(pdfStyle);
+                    }
+                    
+                    // Restore table styles on error
+                    originalTableStyles.forEach(({ element: table, width, maxWidth, fontSize }) => {
+                        table.style.width = width;
+                        table.style.maxWidth = maxWidth;
+                        table.style.fontSize = fontSize;
+                        
+                        const cells = table.querySelectorAll('th, td');
+                        cells.forEach(cell => {
+                            cell.style.padding = '';
+                            cell.style.fontSize = '';
+                        });
+                        
+                        const codeBlocks = table.querySelectorAll('pre code');
+                        codeBlocks.forEach(code => {
+                            code.style.fontSize = '';
+                        });
+                    });
+                    
+                    // Restore visibility
+                    if (sidebar) {
+                        sidebar.style.display = originalSidebarDisplay;
+                    }
+                    filterButtons.forEach((btn, idx) => {
+                        btn.style.display = originalFilterDisplays[idx];
+                    });
+                });
+            }, 200);
+        }
+        
+        // Toggle filter popup
+        function toggleFilterPopup(tableKey) {
+            const popup = document.getElementById(`filter-popup-${tableKey}`);
+            
+            if (!popup) return;
+            
+            if (popup.style.display === 'none' || popup.style.display === '') {
+                // Close all other popups first
+                document.querySelectorAll('.filter-popup').forEach(p => {
+                    p.style.display = 'none';
+                });
+                
+                // Show this popup
+                popup.style.display = 'block';
+            } else {
+                popup.style.display = 'none';
+            }
+        }
+        
+        // Clear all filters for a table
+        function clearFilters(tableKey) {
+            const columnInput = document.querySelector(`.filter-column-input[data-table-key="${tableKey}"]`);
+            const nameInput = document.querySelector(`.filter-name-input[data-table-key="${tableKey}"]`);
+            
+            if (columnInput) columnInput.value = '';
+            if (nameInput) nameInput.value = '';
+            
+            filterTableRows(tableKey, 'column', '');
+            filterTableRows(tableKey, 'name', '');
+        }
+        
+        // Close popup when clicking outside
+        document.addEventListener('click', function(event) {
+            if (!event.target.closest('.filter-toggle-btn') && !event.target.closest('.filter-popup')) {
+                document.querySelectorAll('.filter-popup').forEach(popup => {
+                    popup.style.display = 'none';
+                });
+            }
+        });
+        
+        // Table filtering functionality
+        function initializeTableFilters() {
+            const filterInputs = document.querySelectorAll('.filter-column-input, .filter-name-input');
+            
+            filterInputs.forEach(input => {
+                input.addEventListener('input', function() {
+                    const tableKey = this.getAttribute('data-table-key');
+                    const filterType = this.classList.contains('filter-column-input') ? 'column' : 'name';
+                    const filterValue = this.value.toLowerCase().trim();
+                    
+                    filterTableRows(tableKey, filterType, filterValue);
+                });
+            });
+        }
+        
+        function filterTableRows(tableKey, filterType, filterValue) {
+            const table = document.querySelector(`table.transformer-table[data-table-key="${tableKey}"]`);
+            if (!table) return;
+            
+            const rows = table.querySelectorAll('tbody tr.transformer-row');
+            const columnFilter = document.querySelector(`.filter-column-input[data-table-key="${tableKey}"]`)?.value.toLowerCase().trim() || '';
+            const nameFilter = document.querySelector(`.filter-name-input[data-table-key="${tableKey}"]`)?.value.toLowerCase().trim() || '';
+            
+            rows.forEach(row => {
+                const columnValue = (row.getAttribute('data-column') || '').toLowerCase();
+                const nameValue = (row.getAttribute('data-name') || '').toLowerCase();
+                
+                const matchesColumn = !columnFilter || columnValue.includes(columnFilter);
+                const matchesName = !nameFilter || nameValue.includes(nameFilter);
+                
+                row.style.display = (matchesColumn && matchesName) ? '' : 'none';
+            });
+        }
+        
+        // Table sorting functionality
+        function initializeTableSorting() {
+            const sortableHeaders = document.querySelectorAll('th.sortable');
+            
+            sortableHeaders.forEach(header => {
+                header.addEventListener('click', function() {
+                    const tableKey = this.getAttribute('data-table-key');
+                    const column = this.getAttribute('data-column');
+                    const table = document.querySelector(`table.transformer-table[data-table-key="${tableKey}"]`);
+                    
+                    if (!table) return;
+                    
+                    // Get current sort state
+                    const currentSort = this.getAttribute('data-sort') || 'none';
+                    const newSort = currentSort === 'asc' ? 'desc' : 'asc';
+                    
+                    // Reset all sort icons in this table
+                    table.querySelectorAll('th.sortable').forEach(th => {
+                        th.setAttribute('data-sort', 'none');
+                        const icon = th.querySelector('.sort-icon');
+                        if (icon) {
+                            icon.className = 'bx bx-sort text-sm text-gray-400 sort-icon';
+                        }
+                    });
+                    
+                    // Set new sort state
+                    this.setAttribute('data-sort', newSort);
+                    const icon = this.querySelector('.sort-icon');
+                    if (icon) {
+                        icon.className = `bx bx-sort-${newSort === 'asc' ? 'up' : 'down'} text-sm text-primary sort-icon`;
+                    }
+                    
+                    // Sort the table
+                    sortTable(table, column, newSort);
+                });
+            });
+        }
+        
+        function sortTable(table, column, direction) {
+            const tbody = table.querySelector('tbody');
+            const rows = Array.from(tbody.querySelectorAll('tr.transformer-row'));
+            
+            rows.sort((a, b) => {
+                let aValue, bValue;
+                
+                if (column === 'column') {
+                    aValue = (a.getAttribute('data-column') || '').toLowerCase();
+                    bValue = (b.getAttribute('data-column') || '').toLowerCase();
+                } else if (column === 'name') {
+                    aValue = (a.getAttribute('data-name') || '').toLowerCase();
+                    bValue = (b.getAttribute('data-name') || '').toLowerCase();
+                } else {
+                    return 0;
+                }
+                
+                // Handle empty values
+                if (!aValue && !bValue) return 0;
+                if (!aValue) return 1;
+                if (!bValue) return -1;
+                
+                const comparison = aValue.localeCompare(bValue);
+                return direction === 'asc' ? comparison : -comparison;
+            });
+            
+            // Re-append sorted rows
+            rows.forEach(row => tbody.appendChild(row));
+            
+            // Re-highlight YAML code blocks after sorting
+            tbody.querySelectorAll('pre code.language-yaml').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+        }
+    </script>
+    
+    <style>
+        /* Override highlight.js styles to match NOMA AI theme */
+        .hljs {
+            background: #f8f9fa !important;
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            font-size: 0.75rem;
+            line-height: 1.5;
+        }
+        
+        pre {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+        }
+        
+        pre code {
+            background: transparent;
+            padding: 0;
+            border: none;
+        }
+    </style>
+</body>
+</html>
+

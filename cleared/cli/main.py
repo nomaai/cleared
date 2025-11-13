@@ -5,6 +5,7 @@ import typer
 # Import all command modules
 from cleared.cli.cmds import (
     check_syntax,
+    describe,
     format as format_cmd,
     info,
     init,
@@ -30,6 +31,7 @@ init.register_init_command(app)
 setup.register_setup_command(app)
 lint.register_lint_command(app)
 format_cmd.register_format_command(app)
+describe.register_describe_command(app)
 info.register_info_command(app)
 
 
