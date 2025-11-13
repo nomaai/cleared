@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import traceback
 import typer
 
 from cleared.cli.utils import find_imported_yaml_files, format_yaml_file
@@ -139,8 +140,6 @@ def _print_file_already_formatted(yaml_file: Path) -> None:
 def _print_format_error(yaml_file: Path, error: Exception) -> None:
     """Print error when formatting fails."""
     typer.echo(f"  ❌ Error checking {yaml_file}: {error}", err=True)
-    import traceback
-
     typer.echo(traceback.format_exc(), err=True)
 
 
@@ -155,8 +154,6 @@ def _print_format_check_failed(needs_formatting: list[Path]) -> None:
 def _print_import_error(error: ImportError) -> None:
     """Print import error message."""
     typer.echo(f"❌ {error}", err=True)
-    import traceback
-
     typer.echo(traceback.format_exc(), err=True)
     typer.echo(
         "\n💡 Install ruamel.yaml to enable formatting:\n   pip install ruamel.yaml",
@@ -167,6 +164,4 @@ def _print_import_error(error: ImportError) -> None:
 def _print_error(error: Exception, verbose: bool) -> None:
     """Print error message."""
     typer.echo(f"❌ Error: {error}", err=True)
-    import traceback
-
     typer.echo(traceback.format_exc(), err=True)
