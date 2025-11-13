@@ -95,11 +95,6 @@ tables:
             name: "user_id"
             uid: "user_uid"
             description: "User identifier"
-          deid_config:
-            time_shift:
-              method: "shift_by_years"
-              min: -5
-              max: 5
           datetime_column: "reg_date_time"
       - method: "ColumnDropper"
         uid: "name_drop_transformer"
@@ -185,11 +180,6 @@ tables:
             name: "user_id"
             uid: "user_uid"
             description: "User identifier"
-          deid_config:
-            time_shift:
-              method: "shift_by_years"
-              min: -5
-              max: 5
           datetime_column: "reg_date_time"
       - method: "ColumnDropper"
         uid: "name_drop_transformer"

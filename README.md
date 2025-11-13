@@ -70,12 +70,13 @@
 4. [Rerun De-identification with Consistency](docs/rerun_deidentification_consistency.md) - Maintain consistency when adding new data
 5. [UIDs de-identification](docs/group-level-id-deidentification.md)
 6. [CLI Usage Guide](docs/cli-usage.md)
-7. [Date and Time Shifting](docs/date-and-time-shifting.md)
-8. [Free-text PHI Detection](docs/phi-detection.md)
-9. [Logging and Auditing](docs/logging-and-auditing.md)
-10. [Healthcare Schema Support](docs/healthcare-schema-support.md)
-11. [Custom Transformers Plugins](docs/custom-transformers-plugins.md)
-12. [Contributing](docs/contributing.md)
+7. [Linting Rules Reference](docs/linting_rules.md) - Complete reference for all configuration linting rules
+8. [Date and Time Shifting](docs/date-and-time-shifting.md)
+9. [Free-text PHI Detection](docs/phi-detection.md)
+10. [Logging and Auditing](docs/logging-and-auditing.md)
+11. [Healthcare Schema Support](docs/healthcare-schema-support.md)
+12. [Custom Transformers Plugins](docs/custom-transformers-plugins.md)
+13. [Contributing](docs/contributing.md)
 
 ## 🛣 Roadmap
 

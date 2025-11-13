@@ -203,8 +203,69 @@ print(f"De-identified shape: {users_df_deid.shape}")
 print(f"Columns: {list(users_df_deid.columns)}")
 ```
 
+## Validating Configuration Files
+
+If you're using configuration files (YAML) instead of programmatic setup, you can validate your configuration before running the de-identification process using the `cleared validate` command.
+
+### Validate a Configuration File
+
+The `cleared validate` command performs comprehensive validation by:
+1. **Checking configuration syntax** - Verifies the configuration can be loaded and initialized
+2. **Linting the configuration** - Performs YAML syntax checking and Cleared-specific rule validation
+
+```bash
+# Validate a configuration file
+cleared validate config.yaml
+
+# Validate with strict mode (treats warnings as errors)
+cleared validate config.yaml --strict
+
+# Validate with verbose output
+cleared validate config.yaml --verbose
+```
+
+**Example Output:**
+```bash
+$ cleared validate config.yaml
+
+🔍 Step 1: Checking configuration syntax...
+Configuration loaded from: config.yaml
+✅ Configuration is valid!
+Engine would be initialized with 1 pipelines
+
+✅ Syntax check passed
+
+🔍 Step 2: Linting configuration...
+
+📋 Running YAML linting (yamllint)...
+  ✅ No YAML syntax issues found
+
+🔍 Running Cleared-specific linting...
+  ✅ No Cleared-specific issues found
+
+============================================================
+✅ Validation completed successfully!
+============================================================
+```
+
+If there are any issues, the command will report them with specific rule IDs and line numbers. For a complete reference of all linting rules, see the [Linting Rules Reference](linting_rules.md).
+
+### Other Validation Commands
+
+You can also use more specific validation commands:
+
+```bash
+# Check syntax only (without linting)
+cleared check-syntax config.yaml
+
+# Lint only (without syntax checking)
+cleared lint config.yaml
+```
+
 ## Next Steps
 
 - Learn about [using configuration files](use_cleared_config.md) for more complex setups
 - Explore [multi-table pipelines](multi_table_pipeline_config.md) for related data
+- Check out the [CLI Usage Guide](cli-usage.md) for all available commands
+- Review the [Linting Rules Reference](linting_rules.md) for configuration validation rules
 - Check out the [API reference](../api/) for more transformer options

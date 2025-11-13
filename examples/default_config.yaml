@@ -19,7 +19,6 @@ deid_config:
       name: "encounter_id"
       uid: "encounter_id"
       description: "Encounter identifier"
-  
   time_shift:
     method: "random_days"
     ref_id: "patient_id"
@@ -39,7 +38,6 @@ io:
       configs:
         base_path: "/tmp/output"
         file_format: "csv"
-  
   deid_ref:
     input_config:
       io_type: "filesystem"
@@ -49,7 +47,6 @@ io:
       io_type: "filesystem"
       configs:
         base_path: "/tmp/deid_ref_output"
-  
   runtime_io_path: "/tmp/runtime"
 
 # Table configurations
@@ -66,7 +63,6 @@ tables:
             name: "patient_id"
             uid: "patient_id"
             description: "Patient identifier"
-  
   encounters:
     name: "encounters"
     depends_on: ["patients"]
@@ -79,7 +75,6 @@ tables:
             name: "encounter_id"
             uid: "encounter_id"
             description: "Encounter identifier"
-      
       - method: "DateTimeDeidentifier"
         uid: "admission_date_transformer"
         depends_on: ["encounter_id_transformer"]
