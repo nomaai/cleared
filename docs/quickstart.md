@@ -203,6 +203,28 @@ print(f"De-identified shape: {users_df_deid.shape}")
 print(f"Columns: {list(users_df_deid.columns)}")
 ```
 
+## Testing Your Configuration
+
+Before running your configuration on the full dataset, you can test it with a limited number of rows using the `cleared test` command. This performs a dry run that processes only the first N rows of each table and does not write any outputs, making it safe to test your configuration:
+
+```bash
+# Test with default 10 rows per table
+cleared test config.yaml
+
+# Test with more rows
+cleared test config.yaml --rows 50
+```
+
+The test command runs the same process as `cleared run` but:
+- Only processes the first N rows of each table (configurable with `--rows`)
+- Does not write any output files (dry run mode)
+- Validates that your configuration works correctly without modifying data
+
+This is especially useful for:
+- Verifying your transformers work as expected
+- Testing complex configurations before full runs
+- Debugging configuration issues with a small sample
+
 ## Viewing Configuration Details
 
 Before running your configuration, you can generate a visual HTML report to review all configuration details:
@@ -285,8 +307,9 @@ cleared lint config.yaml
 
 ## Next Steps
 
-- Learn about [using configuration files](use_cleared_config.md) for more complex setups
-- Explore [multi-table pipelines](multi_table_pipeline_config.md) for related data
-- Check out the [CLI Usage Guide](cli-usage.md) for all available commands
-- Review the [Linting Rules Reference](linting_rules.md) for configuration validation rules
-- Check out the [API reference](../api/) for more transformer options
+1. **Test your configuration** with `cleared test config.yaml` to verify everything works
+2. Learn about [using configuration files](use_cleared_config.md) for more complex setups
+3. Explore [multi-table pipelines](multi_table_pipeline_config.md) for related data
+4. Check out the [CLI Usage Guide](cli-usage.md) for all available commands
+5. Review the [Linting Rules Reference](linting_rules.md) for configuration validation rules
+6. Check out the [API reference](../api/) for more transformer options

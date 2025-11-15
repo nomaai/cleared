@@ -7,6 +7,7 @@ The Cleared framework provides a powerful command-line interface (CLI) that allo
 - [Installation](#installation)
 - [Available Commands](#available-commands)
   - [`cleared run`](#cleared-run)
+  - [`cleared test`](#cleared-test)
   - [`cleared validate`](#cleared-validate)
   - [`cleared check-syntax`](#cleared-check-syntax)
   - [`cleared lint`](#cleared-lint)
@@ -70,6 +71,44 @@ cleared run config.yaml --continue-on-error --verbose
 
 # Run with Hydra-style overrides
 cleared run config.yaml -o "io.data.input_config.configs.base_path=/custom/path"
+```
+
+### `cleared test`
+
+Test run the ClearedEngine with a limited number of rows (dry run).
+
+**Usage:**
+```bash
+cleared test <config.yaml> [OPTIONS]
+```
+
+**Arguments:**
+- `config.yaml` - Path to the configuration file
+
+**Options:**
+- `--rows`, `-r` - Number of rows to process per table (default: 10)
+- `--config-name`, `-cn` - Name of the configuration to load (default: cleared_config)
+- `--override` - Override configuration values
+- `--continue-on-error`, `-c` - Continue running remaining pipelines even if one fails
+- `--create-dirs`, `-d` - Create missing directories automatically
+- `--verbose`, `-v` - Enable verbose output
+
+**Description:**
+This command runs the same process as `cleared run` but only processes the first N rows of each table and does not write any outputs. This is useful for testing your configuration before running on the full dataset. It's a dry run mode that validates your configuration works correctly without modifying any files.
+
+**Examples:**
+```bash
+# Test with default 10 rows per table
+cleared test config.yaml
+
+# Test with 50 rows per table
+cleared test config.yaml --rows 50
+
+# Test with verbose output
+cleared test config.yaml -r 100 --verbose
+
+# Test with overrides
+cleared test config.yaml -r 20 -o "name=test"
 ```
 
 ### `cleared validate`
@@ -406,12 +445,18 @@ cleared run config.yaml -o "io.data.input_config.configs.base_path=/input" -o "i
    cleared validate my_project.yaml
    ```
 
-4. **Generate a configuration report (optional):**
+4. **Test your configuration (recommended):**
+   ```bash
+   cleared test my_project.yaml
+   ```
+   This runs a dry run with the first 10 rows to verify everything works before processing the full dataset.
+
+5. **Generate a configuration report (optional):**
    ```bash
    cleared describe my_project.yaml
    ```
 
-5. **Run the de-identification:**
+6. **Run the de-identification:**
    ```bash
    cleared run my_project.yaml --create-dirs
    ```

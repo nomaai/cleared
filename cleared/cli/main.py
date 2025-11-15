@@ -12,6 +12,7 @@ from cleared.cli.cmds import (
     lint,
     run,
     setup,
+    test,
     validate,
 )
 
@@ -25,6 +26,7 @@ app = typer.Typer(
 
 # Register all commands
 run.register_run_command(app)
+test.register_test_command(app)
 check_syntax.register_check_syntax_command(app)
 validate.register_validate_command(app)
 init.register_init_command(app)

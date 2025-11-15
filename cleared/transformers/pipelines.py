@@ -70,6 +70,8 @@ class TablePipeline(Pipeline):
         self,
         df: pd.DataFrame | None = None,
         deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+        rows_limit: int | None = None,
+        test_mode: bool = False,
     ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
         """
         Transform the table data.
@@ -81,6 +83,8 @@ class TablePipeline(Pipeline):
         Args:
             df: Optional input DataFrame. If None, table will be read from data source
             deid_ref_dict: Optional dictionary of de-identification reference DataFrames, keys are the UID of the transformers that created the reference
+            rows_limit: Optional limit on number of rows to read (for testing)
+            test_mode: If True, skip writing outputs (dry run mode)
 
         Returns:
             Tuple of (transformed_df, updated_deid_ref_dict)
@@ -95,7 +99,7 @@ class TablePipeline(Pipeline):
                 with self._create_data_loader(
                     self.io_config.input_config
                 ) as data_loader:
-                    df = data_loader.read_table(self.table_name)
+                    df = data_loader.read_table(self.table_name, rows_limit=rows_limit)
             except Exception as e:
                 raise ValueError(
                     f"Failed to read table '{self.table_name}': {e!s}"
@@ -108,8 +112,9 @@ class TablePipeline(Pipeline):
         # Process with base pipeline
         df, deid_ref_dict = super().transform(df, deid_ref_dict)
 
-        # Write de-identified data to the data source
-        with self._create_data_loader(self.io_config.output_config) as data_loader:
-            data_loader.write_deid_table(df, self.table_name)
+        # Write de-identified data to the data source (skip in test mode)
+        if not test_mode:
+            with self._create_data_loader(self.io_config.output_config) as data_loader:
+                data_loader.write_deid_table(df, self.table_name)
 
         return df, deid_ref_dict

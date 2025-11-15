@@ -97,12 +97,15 @@ class FileSystemDataLoader(BaseDataLoader):
         extension = extensions.get(self.file_format, self.file_format)
         return self.base_path / f"{table_name}.{extension}"
 
-    def read_table(self, table_name: str) -> pd.DataFrame:
+    def read_table(
+        self, table_name: str, rows_limit: int | None = None
+    ) -> pd.DataFrame:
         """
         Read data from a file.
 
         Args:
             table_name: Name of the table (file without extension)
+            rows_limit: Optional limit on number of rows to read (for testing)
 
         Returns:
             DataFrame containing the table data
@@ -120,15 +123,26 @@ class FileSystemDataLoader(BaseDataLoader):
         try:
             # Read based on file format
             if self.file_format == "csv":
-                df = pd.read_csv(file_path, encoding=self.encoding, sep=self.separator)
+                df = pd.read_csv(
+                    file_path,
+                    encoding=self.encoding,
+                    sep=self.separator,
+                    nrows=rows_limit,
+                )
             elif self.file_format == "parquet":
                 df = pd.read_parquet(file_path)
+                if rows_limit is not None:
+                    df = df.head(rows_limit)
             elif self.file_format == "json":
                 df = pd.read_json(file_path)
+                if rows_limit is not None:
+                    df = df.head(rows_limit)
             elif self.file_format in ["xlsx", "xls"]:
-                df = pd.read_excel(file_path)
+                df = pd.read_excel(file_path, nrows=rows_limit)
             elif self.file_format == "pickle":
                 df = pd.read_pickle(file_path)
+                if rows_limit is not None:
+                    df = df.head(rows_limit)
             else:
                 raise FileFormatError(f"Unsupported file format: {self.file_format}")
 

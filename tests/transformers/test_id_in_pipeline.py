@@ -59,12 +59,17 @@ class MockDataLoader(BaseDataLoader):
         """Mock connection initialization."""
         pass
 
-    def read_table(self, table_name: str) -> pd.DataFrame:
+    def read_table(
+        self, table_name: str, rows_limit: int | None = None
+    ) -> pd.DataFrame:
         """Mock read table."""
         self.read_called = True
         self.last_table_name = table_name
         if table_name in self.data:
-            return self.data[table_name].copy()
+            df = self.data[table_name].copy()
+            if rows_limit is not None:
+                df = df.head(rows_limit)
+            return df
         else:
             from cleared.io.base import TableNotFoundError
 
