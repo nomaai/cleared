@@ -22,9 +22,14 @@ class ConcreteDataLoader(BaseDataLoader):
         """Mock implementation of connection initialization."""
         self.connection_initialized = True
 
-    def read_table(self, table_name: str) -> pd.DataFrame:
+    def read_table(
+        self, table_name: str, rows_limit: int | None = None
+    ) -> pd.DataFrame:
         """Mock implementation of read_table."""
-        return pd.DataFrame({"id": [1, 2, 3], "name": ["A", "B", "C"]})
+        df = pd.DataFrame({"id": [1, 2, 3], "name": ["A", "B", "C"]})
+        if rows_limit is not None:
+            df = df.head(rows_limit)
+        return df
 
     def write_deid_table(
         self,
@@ -45,12 +50,17 @@ class CustomDataLoader(BaseDataLoader):
         """Initialize custom connection."""
         self.data = {}  # In-memory storage for example
 
-    def read_table(self, table_name: str) -> pd.DataFrame:
+    def read_table(
+        self, table_name: str, rows_limit: int | None = None
+    ) -> pd.DataFrame:
         """Read from custom data source."""
         if table_name not in self.data:
             raise TableNotFoundError(f"Table {table_name} not found")
 
-        return self.data[table_name]
+        df = self.data[table_name]
+        if rows_limit is not None:
+            df = df.head(rows_limit)
+        return df
 
     def write_deid_table(
         self,

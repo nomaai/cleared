@@ -293,7 +293,12 @@ class ClearedEngine:
             pipelines.append(pip)
         return pipelines
 
-    def run(self, continue_on_error: bool = False) -> dict[str, Any]:
+    def run(
+        self,
+        continue_on_error: bool = False,
+        rows_limit: int | None = None,
+        test_mode: bool = False,
+    ) -> dict[str, Any]:
         """
         Run all pipelines sequentially.
 
@@ -304,6 +309,8 @@ class ClearedEngine:
         Args:
             continue_on_error: If True, continue running remaining pipelines even if one fails.
                              If False, stop on first error.
+            rows_limit: Optional limit on number of rows to read per table (for testing)
+            test_mode: If True, skip writing outputs (dry run mode)
 
         Returns:
             Dictionary containing:
@@ -328,15 +335,22 @@ class ClearedEngine:
         # Execute each pipeline
         for table_pipeline in self._pipelines:
             current_deid_ref_dict = self._run_table_pipeline(
-                table_pipeline, results, current_deid_ref_dict, continue_on_error
+                table_pipeline,
+                results,
+                current_deid_ref_dict,
+                continue_on_error,
+                rows_limit=rows_limit,
+                test_mode=test_mode,
             )
 
         # Store results in instance
         self.results = results
-        self._save_results(results)
 
-        # Save de-identification reference files
-        self._save_deid_ref_files(current_deid_ref_dict)
+        # Skip saving outputs in test mode
+        if not test_mode:
+            self._save_results(results)
+            # Save de-identification reference files
+            self._save_deid_ref_files(current_deid_ref_dict)
 
         return results
 
@@ -346,6 +360,8 @@ class ClearedEngine:
         results: Results,
         current_deid_ref_dict: dict[str, pd.DataFrame],
         continue_on_error: bool,
+        rows_limit: int | None = None,
+        test_mode: bool = False,
     ) -> dict[str, pd.DataFrame]:
         """
         Run a table pipeline and update the de-identification reference dictionary.
@@ -355,6 +371,8 @@ class ClearedEngine:
             results: Results to store
             current_deid_ref_dict: Current de-identification reference dictionary
             continue_on_error: Whether to continue execution if this pipeline fails
+            rows_limit: Optional limit on number of rows to read per table (for testing)
+            test_mode: If True, skip writing outputs (dry run mode)
 
         Returns:
             Updated de-identification reference dictionary
@@ -373,7 +391,10 @@ class ClearedEngine:
             ):
                 # Pipeline has transform method - execute it
                 _, updated_deid_ref_dict = table_pipeline.transform(
-                    df=None, deid_ref_dict=current_deid_ref_dict
+                    df=None,
+                    deid_ref_dict=current_deid_ref_dict,
+                    rows_limit=rows_limit,
+                    test_mode=test_mode,
                 )
 
                 # Store pipeline result

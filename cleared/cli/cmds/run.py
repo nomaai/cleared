@@ -73,35 +73,81 @@ def register_run_command(app: typer.Typer) -> None:
             cleared run config.yaml -o "io.data.input_config.configs.base_path=/tmp/input" -c
 
         """
-        try:
-            setup_hydra_config_store()
+        _run_engine_internal(
+            config_path=config_path,
+            config_name=config_name,
+            overrides=overrides,
+            continue_on_error=continue_on_error,
+            create_dirs=create_dirs,
+            verbose=verbose,
+            rows_limit=None,
+            test_mode=False,
+        )
 
-            cleared_config = load_config_from_file(config_path, config_name, overrides)
-            _print_config_loaded(config_path, overrides, verbose)
 
-            path_status = validate_paths(cleared_config)
-            missing_paths = [path for path, exists in path_status.items() if not exists]
+def _run_engine_internal(
+    config_path: Path,
+    config_name: str,
+    overrides: list[str] | None,
+    continue_on_error: bool,
+    create_dirs: bool,
+    verbose: bool,
+    rows_limit: int | None,
+    test_mode: bool,
+) -> None:
+    """
+    Run the engine with optional test mode.
 
-            _print_path_validation(missing_paths, create_dirs, verbose)
+    Args:
+        config_path: Path to the configuration file
+        config_name: Name of the configuration to load
+        overrides: Configuration overrides
+        continue_on_error: Continue on error flag
+        create_dirs: Create directories flag
+        verbose: Verbose output flag
+        rows_limit: Optional limit on number of rows to read per table (for testing)
+        test_mode: If True, skip writing outputs (dry run mode)
 
-            if missing_paths and create_dirs:
-                create_missing_directories(cleared_config)
+    """
+    try:
+        setup_hydra_config_store()
 
-            engine = ClearedEngine.__new__(ClearedEngine)
-            engine._init_from_config(cleared_config)
+        cleared_config = load_config_from_file(config_path, config_name, overrides)
+        _print_config_loaded(config_path, overrides, verbose)
 
-            _print_engine_initialized(engine._pipelines, verbose)
+        path_status = validate_paths(cleared_config)
+        missing_paths = [path for path, exists in path_status.items() if not exists]
 
+        _print_path_validation(missing_paths, create_dirs, verbose)
+
+        if missing_paths and create_dirs:
+            create_missing_directories(cleared_config)
+
+        engine = ClearedEngine.__new__(ClearedEngine)
+        engine._init_from_config(cleared_config)
+
+        _print_engine_initialized(engine._pipelines, verbose)
+
+        if test_mode:
+            typer.echo(
+                f"Starting test run (processing first {rows_limit} rows per table, no outputs)..."
+            )
+        else:
             typer.echo("Starting de-identification process...")
-            results = engine.run(continue_on_error=continue_on_error)
 
-            _display_results(results, verbose)
+        results = engine.run(
+            continue_on_error=continue_on_error,
+            rows_limit=rows_limit,
+            test_mode=test_mode,
+        )
 
-        except Exception as e:
-            _print_error(e, verbose)
-            raise typer.Exit(1) from e
-        finally:
-            cleanup_hydra()
+        _display_results(results, verbose)
+
+    except Exception as e:
+        _print_error(e, verbose)
+        raise typer.Exit(1) from e
+    finally:
+        cleanup_hydra()
 
 
 # ============================================================================

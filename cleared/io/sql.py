@@ -113,12 +113,15 @@ class SQLDataLoader(BaseDataLoader):
 
         return f"{driver}://{username}:{password}@{host}{port}/{database}"
 
-    def read_table(self, table_name: str) -> pd.DataFrame:
+    def read_table(
+        self, table_name: str, rows_limit: int | None = None
+    ) -> pd.DataFrame:
         """
         Read data from a SQL table.
 
         Args:
             table_name: Name of the table to read from
+            rows_limit: Optional limit on number of rows to read (for testing)
 
         Returns:
             DataFrame containing the table data
@@ -133,8 +136,12 @@ class SQLDataLoader(BaseDataLoader):
             if not self.table_exists(table_name):
                 raise TableNotFoundError(f"Table '{table_name}' does not exist")
 
-            # Build simple query to read entire table
-            query = f"SELECT * FROM {table_name}"
+            # Build query to read table (with optional limit)
+            if rows_limit is not None:
+                # Use database-specific LIMIT syntax
+                query = f"SELECT * FROM {table_name} LIMIT {rows_limit}"
+            else:
+                query = f"SELECT * FROM {table_name}"
 
             # Execute query
             with self.engine.connect() as conn:

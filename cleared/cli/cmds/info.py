@@ -36,12 +36,14 @@ def _print_commands() -> None:
     """Print available commands."""
     typer.echo("Available commands:")
     typer.echo("  run         - Run the de-identification engine")
+    typer.echo("  test        - Test run with limited rows (dry run, no outputs)")
     typer.echo("  validate    - Validate a configuration file (check-syntax + lint)")
     typer.echo("  check-syntax - Check configuration syntax and structure")
     typer.echo("  lint        - Lint a configuration file (YAML + Cleared rules)")
     typer.echo("  format      - Format YAML configuration files and imported sub-files")
     typer.echo("  setup       - Create project directories from config")
     typer.echo("  init        - Initialize a new project with sample config")
+    typer.echo("  describe    - Generate HTML description of the configuration")
     typer.echo("  info        - Show this information")
     typer.echo("")
 
@@ -57,6 +59,8 @@ def _print_examples() -> None:
     typer.echo("  cleared lint config.yaml              # Lint only")
     typer.echo("  cleared format config.yaml            # Format YAML files")
     typer.echo("  cleared setup config.yaml            # Create directories")
+    typer.echo("  cleared test config.yaml              # Test with 10 rows (dry run)")
+    typer.echo("  cleared test config.yaml --rows 50    # Test with 50 rows")
     typer.echo("  cleared run config.yaml               # Run de-identification")
     typer.echo(
         "  cleared run config.yaml -o 'deid_config.global_uids.patient_id.name=patient_id'"

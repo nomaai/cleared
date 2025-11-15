@@ -132,12 +132,15 @@ class BaseDataLoader(ABC):
         pass
 
     @abstractmethod
-    def read_table(self, table_name: str) -> pd.DataFrame:
+    def read_table(
+        self, table_name: str, rows_limit: int | None = None
+    ) -> pd.DataFrame:
         """
         Read data from a table.
 
         Args:
             table_name: Name of the table to read from
+            rows_limit: Optional limit on number of rows to read (for testing)
 
         Returns:
             DataFrame containing the table data
@@ -316,9 +319,9 @@ class BaseDataLoader(ABC):
             tables = self.list_tables()
             return table_name in tables
         except NotImplementedError:
-            # Fallback: try to read the table with limit=0
+            # Fallback: try to read the table with rows_limit=0
             try:
-                self.read_table(table_name, limit=0)
+                self.read_table(table_name, rows_limit=0)
                 return True
             except Exception:
                 return False
