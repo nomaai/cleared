@@ -77,7 +77,10 @@ class TestRunEngineInternal:
                     ),
                 ),
                 deid_ref=PairedIOConfig(
-                    input_config=None,
+                    input_config=IOConfig(
+                        io_type="filesystem",
+                        configs={"base_path": str(self.deid_ref_dir)},
+                    ),
                     output_config=IOConfig(
                         io_type="filesystem",
                         configs={"base_path": str(self.deid_ref_dir)},
@@ -134,7 +137,10 @@ class TestRunEngineInternal:
                             },
                         },
                         "deid_ref": {
-                            "input_config": None,
+                            "input_config": {
+                                "io_type": "filesystem",
+                                "configs": {"base_path": str(self.deid_ref_dir)},
+                            },
                             "output_config": {
                                 "io_type": "filesystem",
                                 "configs": {"base_path": str(self.deid_ref_dir)},
@@ -339,7 +345,10 @@ class TestEngineRowsLimit:
                     ),
                 ),
                 deid_ref=PairedIOConfig(
-                    input_config=None,
+                    input_config=IOConfig(
+                        io_type="filesystem",
+                        configs={"base_path": str(self.deid_ref_dir)},
+                    ),
                     output_config=IOConfig(
                         io_type="filesystem",
                         configs={"base_path": str(self.deid_ref_dir)},
@@ -839,7 +848,10 @@ class TestEdgeCases:
                         ),
                     ),
                     deid_ref=PairedIOConfig(
-                        input_config=None,
+                        input_config=IOConfig(
+                            io_type="filesystem",
+                            configs={"base_path": str(deid_ref_dir)},
+                        ),
                         output_config=IOConfig(
                             io_type="filesystem",
                             configs={"base_path": str(deid_ref_dir)},

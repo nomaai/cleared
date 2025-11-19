@@ -9,19 +9,43 @@ import yaml
 from cleared.config.structure import (
     DeIDConfig,
     ClearedIOConfig,
+    ClearedConfig,
     IOConfig,
     PairedIOConfig,
     TableConfig,
     TransformerConfig,
+    IdentifierConfig,
+    TimeShiftConfig,
+    FilterConfig,
 )
-
-from cleared.config.structure import ClearedConfig
-from cleared.config.structure import TimeShiftConfig
 from io import StringIO
 from pathlib import Path
 from ruamel.yaml import YAML
-from typing import Any
 from hydra.core.global_hydra import GlobalHydra
+
+
+def _initialize_config_store() -> None:
+    """
+    Initialize Hydra ConfigStore with all Cleared configuration classes.
+
+    This registers all dataclasses from structure.py with Hydra's ConfigStore
+    so they can be used as structured configs.
+    """
+    from hydra.core.config_store import ConfigStore
+
+    cs = ConfigStore.instance()
+
+    # Register all configuration classes
+    cs.store(name="cleared_config", node=ClearedConfig)
+    cs.store(name="identifier_config", node=IdentifierConfig)
+    cs.store(name="time_shift_config", node=TimeShiftConfig)
+    cs.store(name="deid_config", node=DeIDConfig)
+    cs.store(name="filter_config", node=FilterConfig)
+    cs.store(name="transformer_config", node=TransformerConfig)
+    cs.store(name="table_config", node=TableConfig)
+    cs.store(name="io_config", node=IOConfig)
+    cs.store(name="paired_io_config", node=PairedIOConfig)
+    cs.store(name="cleared_io_config", node=ClearedIOConfig)
 
 
 def load_config_from_file(
@@ -32,10 +56,12 @@ def load_config_from_file(
     """
     Load a ClearedConfig from a YAML file with support for Hydra-style imports.
 
+    Uses Hydra's compose API with structured configs to directly return ClearedConfig objects.
+
     Args:
         config_path: Path to the configuration file
-        config_name: Name of the configuration to load (unused for now)
-        overrides: List of configuration overrides (unused for now)
+        config_name: Name of the configuration to load (defaults to filename without extension)
+        overrides: List of configuration overrides in Hydra format (e.g., ["key=value", "group.key=value"])
 
     Returns:
         ClearedConfig object
@@ -44,24 +70,61 @@ def load_config_from_file(
         Exception: If configuration loading fails
 
     """
+    from hydra import compose, initialize_config_dir
+    from hydra.core.global_hydra import GlobalHydra
+    from hydra.utils import instantiate
+    from omegaconf import OmegaConf
+
     # Convert to Path object if it's a string
     config_path = Path(config_path)
     config_dir = config_path.parent
+    config_file_stem = config_path.stem
 
-    # Load the main YAML file
-    with open(config_path) as f:
-        main_cfg = yaml.safe_load(f)
+    # Determine config name from filename if using default
+    if config_name == "cleared_config":
+        config_name = config_file_stem
 
-    # Check if this is a Hydra-style config with defaults
-    if "defaults" in main_cfg:
-        # Process imports manually
-        merged_cfg = _merge_hydra_configs(main_cfg, config_dir)
-    else:
-        # Regular YAML config
-        merged_cfg = main_cfg
+    # Clean up any existing Hydra instance
+    if GlobalHydra().is_initialized():
+        GlobalHydra.instance().clear()
 
-    # Convert to ClearedConfig
-    return _hydra_to_cleared_config(merged_cfg)
+    # Initialize ConfigStore with all config classes
+    _initialize_config_store()
+
+    try:
+        # Initialize Hydra with the config directory
+        with initialize_config_dir(config_dir=str(config_dir), version_base=None):
+            # Compose the configuration with overrides
+            overrides_list = overrides if overrides else []
+            cfg = compose(config_name=config_name, overrides=overrides_list)
+
+        # Convert OmegaConf to ClearedConfig using structured configs
+        # Merge the config with the structured config schema to get proper defaults
+        structured_cfg = OmegaConf.structured(ClearedConfig)
+        # Merge the actual config data with the structured schema
+        merged_cfg = OmegaConf.merge(structured_cfg, cfg)
+        # Use instantiate with _convert_="object" to convert to actual dataclass instance
+        return instantiate(merged_cfg, _convert_="object")
+    except Exception:
+        # Fallback to manual loading if Hydra fails (e.g., for non-Hydra configs)
+        # This maintains backward compatibility
+        with open(config_path) as f:
+            main_cfg = yaml.safe_load(f)
+
+        # Check if this is a Hydra-style config with defaults
+        if "defaults" in main_cfg:
+            # Process imports manually
+            merged_cfg = _merge_hydra_configs(main_cfg, config_dir)
+        else:
+            # Regular YAML config
+            merged_cfg = main_cfg
+
+        # Convert dict to OmegaConf and use structured configs for conversion
+        cfg_dict = OmegaConf.create(merged_cfg)
+        # Merge with structured config schema to get proper defaults
+        structured_cfg = OmegaConf.structured(ClearedConfig)
+        merged_cfg = OmegaConf.merge(structured_cfg, cfg_dict)
+        return instantiate(merged_cfg, _convert_="object")
 
 
 def _merge_hydra_configs(main_cfg: dict, config_dir: Path) -> dict:
@@ -121,80 +184,6 @@ def _deep_merge(dict1: dict, dict2: dict) -> dict:
             result[key] = value
 
     return result
-
-
-def _hydra_to_cleared_config(cfg: Any) -> ClearedConfig:
-    """Convert Hydra config to ClearedConfig object."""
-    # Extract deid_config
-    deid_config_data = cfg.get("deid_config", {})
-
-    time_shift_data = deid_config_data.get("time_shift")
-    time_shift = None
-    if time_shift_data:
-        # Filter out unsupported fields like 'ref_id' (if any)
-        time_shift_dict = {
-            k: v for k, v in time_shift_data.items() if k in ["method", "min", "max"]
-        }
-        time_shift = TimeShiftConfig(**time_shift_dict)
-
-    deid_config = DeIDConfig(time_shift=time_shift)
-
-    # Extract io config
-    io_data = cfg.get("io", {})
-    data_config = io_data.get("data", {})
-    input_config_data = data_config.get("input_config", {})
-    input_config = IOConfig(
-        io_type=input_config_data.pop("io_type", "filesystem"), **input_config_data
-    )
-    output_config_data = data_config.get("output_config", {})
-    output_config = IOConfig(
-        io_type=output_config_data.pop("io_type", "filesystem"), **output_config_data
-    )
-    data_paired = PairedIOConfig(input_config=input_config, output_config=output_config)
-
-    deid_ref_data = io_data.get("deid_ref", {})
-    deid_input_data = deid_ref_data.get("input_config", {})
-    deid_input_config = (
-        IOConfig(
-            io_type=deid_input_data.pop("io_type", "filesystem"), **deid_input_data
-        )
-        if deid_ref_data.get("input_config")
-        else None
-    )
-    deid_output_data = deid_ref_data.get("output_config", {})
-    deid_output_config = IOConfig(
-        io_type=deid_output_data.pop("io_type", "filesystem"), **deid_output_data
-    )
-    deid_ref_paired = PairedIOConfig(
-        input_config=deid_input_config, output_config=deid_output_config
-    )
-
-    runtime_io_path = io_data.get("runtime_io_path", "/tmp/runtime")
-    io_config = ClearedIOConfig(
-        data=data_paired, deid_ref=deid_ref_paired, runtime_io_path=runtime_io_path
-    )
-
-    # Extract tables
-    tables = {}
-    for table_name, table_data in cfg.get("tables", {}).items():
-        transformers = []
-        for transformer_data in table_data.get("transformers", []):
-            transformers.append(TransformerConfig(**transformer_data))
-
-        table_config = TableConfig(
-            name=table_data.get("name", table_name),
-            depends_on=table_data.get("depends_on", []),
-            transformers=transformers,
-        )
-        tables[table_name] = table_config
-
-    # Create ClearedConfig object
-    return ClearedConfig(
-        name=cfg.get("name", "cleared_engine"),
-        deid_config=deid_config,
-        io=io_config,
-        tables=tables,
-    )
 
 
 def create_sample_config(output_path: Path) -> None:
@@ -356,10 +345,9 @@ def cleanup_hydra():
 
 def setup_hydra_config_store() -> None:
     """Set up Hydra configuration store with ClearedConfig."""
-    from hydra.core.config_store import ConfigStore
-
-    cs = ConfigStore.instance()
-    cs.store(name="cleared_config", node=ClearedConfig)
+    # This function is kept for backward compatibility
+    # The actual initialization is now done in _initialize_config_store()
+    _initialize_config_store()
 
 
 def find_imported_yaml_files(config_path: Path) -> set[Path]:

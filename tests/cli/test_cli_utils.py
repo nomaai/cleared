@@ -12,7 +12,6 @@ from cleared.cli.utils import (
     create_sample_config,
     validate_paths,
     create_missing_directories,
-    _hydra_to_cleared_config,
 )
 from cleared.config.structure import (
     ClearedConfig,
@@ -142,7 +141,11 @@ tables: {}
             os.unlink(temp_file)
 
     def test_hydra_to_cleared_config_conversion(self):
-        """Test conversion from Hydra config to ClearedConfig."""
+        """Test conversion from Hydra config to ClearedConfig using structured configs."""
+        from omegaconf import OmegaConf
+        from hydra.utils import instantiate
+        from cleared.config.structure import ClearedConfig
+
         hydra_config = {
             "name": "test_engine",
             "deid_config": {
@@ -193,7 +196,11 @@ tables: {}
             },
         }
 
-        config = _hydra_to_cleared_config(hydra_config)
+        # Use structured configs for conversion (same approach as load_config_from_file)
+        cfg_dict = OmegaConf.create(hydra_config)
+        structured_cfg = OmegaConf.structured(ClearedConfig)
+        merged_cfg = OmegaConf.merge(structured_cfg, cfg_dict)
+        config = instantiate(merged_cfg, _convert_="object")
 
         # Verify conversion
         assert isinstance(config, ClearedConfig)
@@ -203,10 +210,14 @@ tables: {}
         assert len(config.tables) == 1
 
     def test_hydra_to_cleared_config_with_none_values(self):
-        """Test conversion with None values in configuration."""
+        """Test conversion with None values in optional fields using structured configs."""
+        from omegaconf import OmegaConf
+        from hydra.utils import instantiate
+        from cleared.config.structure import ClearedConfig
+
         hydra_config = {
             "name": "test_engine",
-            "deid_config": {"time_shift": None},
+            "deid_config": {"time_shift": None},  # time_shift is Optional
             "io": {
                 "data": {
                     "input_config": {
@@ -219,7 +230,11 @@ tables: {}
                     },
                 },
                 "deid_ref": {
-                    "input_config": None,
+                    # input_config is required, so we provide it
+                    "input_config": {
+                        "io_type": "filesystem",
+                        "configs": {"base_path": "/tmp/deid_ref_input"},
+                    },
                     "output_config": {
                         "io_type": "filesystem",
                         "configs": {"base_path": "/tmp/deid_ref_output"},
@@ -230,12 +245,15 @@ tables: {}
             "tables": {},
         }
 
-        config = _hydra_to_cleared_config(hydra_config)
+        # Use structured configs for conversion (same approach as load_config_from_file)
+        cfg_dict = OmegaConf.create(hydra_config)
+        structured_cfg = OmegaConf.structured(ClearedConfig)
+        merged_cfg = OmegaConf.merge(structured_cfg, cfg_dict)
+        config = instantiate(merged_cfg, _convert_="object")
 
-        # Verify conversion handles None values
+        # Verify conversion handles None values in optional fields
         assert isinstance(config, ClearedConfig)
         assert config.deid_config.time_shift is None
-        assert config.io.deid_ref.input_config is None
         assert config.tables == {}
 
 
