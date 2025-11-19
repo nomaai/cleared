@@ -939,3 +939,435 @@ class TestEdgeCases:
             result_deid_ref_dict[transformer._timeshift_key()][idconfig.uid].iloc[0]
             == 1
         )
+
+
+class TestDateTimeDeidentifierReverse:
+    """Comprehensive tests for DateTimeDeidentifier reverse functionality."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.idconfig = IdentifierConfig(
+            name="patient_id", uid="patient_uid", description="Patient identifier"
+        )
+        self.time_shift_config = TimeShiftConfig(method="shift_by_days", min=1, max=30)
+        self.deid_config = DeIDConfig(time_shift=self.time_shift_config)
+        self.transformer = DateTimeDeidentifier(
+            idconfig=self.idconfig,
+            global_deid_config=self.deid_config,
+            datetime_column="datetime_col",
+            uid="test_transformer",
+        )
+
+    def test_reverse_success(self):
+        """Test successful reverse operation restores original datetime values."""
+        # Create original data
+        original_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    datetime(2023, 1, 1),
+                    datetime(2023, 1, 2),
+                    datetime(2023, 1, 3),
+                ],
+            }
+        )
+
+        # First, transform the data
+        deid_ref_dict = {}
+        transformed_df, deid_ref_dict = self.transformer.transform(
+            original_df, deid_ref_dict
+        )
+
+        # Verify transformation occurred
+        assert not transformed_df["datetime_col"].equals(original_df["datetime_col"])
+
+        # Now reverse the transformation
+        reversed_df, _ = self.transformer.reverse(transformed_df, deid_ref_dict)
+
+        # Check that datetime values are restored (within floating point precision)
+        pd.testing.assert_frame_equal(
+            reversed_df[["patient_id", "datetime_col"]],
+            original_df[["patient_id", "datetime_col"]],
+            check_dtype=False,
+        )
+
+    def test_reverse_with_existing_timeshift_mappings(self):
+        """Test reverse with pre-existing timeshift mappings in deid_ref_dict."""
+        # Create shifted data (simulating already transformed data)
+        shifted_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    datetime(2023, 1, 6),  # Shifted by 5 days
+                    datetime(2023, 1, 12),  # Shifted by 10 days
+                    datetime(2023, 1, 18),  # Shifted by 15 days
+                ],
+            }
+        )
+
+        # Create timeshift mappings
+        timeshift_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [1, 2, 3],
+                self.transformer._timeshift_key(): [5, 10, 15],
+            }
+        )
+        deid_ref_dict = {self.transformer._timeshift_key(): timeshift_df}
+
+        # Reverse the transformation
+        reversed_df, _ = self.transformer.reverse(shifted_df, deid_ref_dict)
+
+        # Check that values are restored correctly
+        expected_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    datetime(2023, 1, 1),  # 2023-01-06 - 5 days
+                    datetime(2023, 1, 2),  # 2023-01-12 - 10 days
+                    datetime(2023, 1, 3),  # 2023-01-18 - 15 days
+                ],
+            }
+        )
+
+        pd.testing.assert_frame_equal(
+            reversed_df[["patient_id", "datetime_col"]],
+            expected_df[["patient_id", "datetime_col"]],
+            check_dtype=False,
+        )
+
+    def test_reverse_missing_timeshift_mappings_raises_error(self):
+        """Test reverse raises error when timeshift mappings are missing."""
+        shifted_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    datetime(2023, 1, 6),
+                    datetime(2023, 1, 12),
+                    datetime(2023, 1, 18),
+                ],
+            }
+        )
+
+        # Empty deid_ref_dict (no timeshift mappings)
+        deid_ref_dict = {}
+
+        with pytest.raises(
+            ValueError,
+            match=f"Time shift reference not found for transformer {self.transformer.uid}",
+        ):
+            self.transformer.reverse(shifted_df, deid_ref_dict)
+
+    def test_reverse_missing_reference_column_raises_error(self):
+        """Test reverse raises error when reference column is missing."""
+        shifted_df = pd.DataFrame(
+            {
+                "other_id": [1, 2, 3],  # Wrong column name
+                "datetime_col": [
+                    datetime(2023, 1, 6),
+                    datetime(2023, 1, 12),
+                    datetime(2023, 1, 18),
+                ],
+            }
+        )
+
+        timeshift_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [1, 2, 3],
+                self.transformer._timeshift_key(): [5, 10, 15],
+            }
+        )
+        deid_ref_dict = {self.transformer._timeshift_key(): timeshift_df}
+
+        with pytest.raises(
+            ValueError, match="Reference column 'patient_id' not found in DataFrame"
+        ):
+            self.transformer.reverse(shifted_df, deid_ref_dict)
+
+    def test_reverse_missing_datetime_column_raises_error(self):
+        """Test reverse raises error when datetime column is missing."""
+        shifted_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "other_col": [
+                    datetime(2023, 1, 6),
+                    datetime(2023, 1, 12),
+                    datetime(2023, 1, 18),
+                ],
+            }
+        )
+
+        timeshift_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [1, 2, 3],
+                self.transformer._timeshift_key(): [5, 10, 15],
+            }
+        )
+        deid_ref_dict = {self.transformer._timeshift_key(): timeshift_df}
+
+        with pytest.raises(
+            ValueError, match="Column 'datetime_col' not found in DataFrame"
+        ):
+            self.transformer.reverse(shifted_df, deid_ref_dict)
+
+    def test_reverse_incomplete_mappings_raises_error(self):
+        """Test reverse raises error when some values don't have shift mappings."""
+        shifted_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3, 4],  # 4 values
+                "datetime_col": [
+                    datetime(2023, 1, 6),
+                    datetime(2023, 1, 12),
+                    datetime(2023, 1, 18),
+                    datetime(2023, 1, 24),
+                ],
+            }
+        )
+
+        # Timeshift mappings with only 3 values (missing 4)
+        timeshift_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [1, 2, 3],
+                self.transformer._timeshift_key(): [5, 10, 15],
+            }
+        )
+        deid_ref_dict = {self.transformer._timeshift_key(): timeshift_df}
+
+        with pytest.raises(
+            ValueError,
+            match="Time shift reverse failed: original length 4, processed length 3",
+        ):
+            self.transformer.reverse(shifted_df, deid_ref_dict)
+
+    def test_reverse_preserves_nulls_in_datetime_column(self):
+        """Test reverse preserves null values in datetime column."""
+        # Create shifted data with nulls
+        shifted_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    datetime(2023, 1, 6),  # Shifted
+                    None,  # Null preserved
+                    datetime(2023, 1, 18),  # Shifted
+                ],
+            }
+        )
+
+        timeshift_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [1, 2, 3],
+                self.transformer._timeshift_key(): [5, 10, 15],
+            }
+        )
+        deid_ref_dict = {self.transformer._timeshift_key(): timeshift_df}
+
+        reversed_df, _ = self.transformer.reverse(shifted_df, deid_ref_dict)
+
+        # Check that null is preserved
+        assert pd.isna(reversed_df["datetime_col"].iloc[1])
+        # Check that non-null values are reversed
+        assert not pd.isna(reversed_df["datetime_col"].iloc[0])
+        assert not pd.isna(reversed_df["datetime_col"].iloc[2])
+
+    def test_reverse_empty_dataframe(self):
+        """Test reverse with empty DataFrame."""
+        empty_df = pd.DataFrame(columns=["patient_id", "datetime_col"])
+        timeshift_df = pd.DataFrame(
+            columns=[self.idconfig.uid, self.transformer._timeshift_key()]
+        )
+        deid_ref_dict = {self.transformer._timeshift_key(): timeshift_df}
+
+        reversed_df, _ = self.transformer.reverse(empty_df, deid_ref_dict)
+
+        assert len(reversed_df) == 0
+        assert list(reversed_df.columns) == ["patient_id", "datetime_col"]
+
+    def test_reverse_different_time_shift_methods(self):
+        """Test reverse works with different time shift methods."""
+        methods = [
+            ("shift_by_hours", pd.DateOffset(hours=5)),
+            ("shift_by_days", pd.DateOffset(days=5)),
+            ("shift_by_weeks", pd.DateOffset(weeks=2)),
+            ("shift_by_months", pd.DateOffset(months=2)),
+            ("shift_by_years", pd.DateOffset(years=1)),
+        ]
+
+        for method, _offset in methods:
+            time_shift_config = TimeShiftConfig(method=method, min=1, max=10)
+            deid_config = DeIDConfig(time_shift=time_shift_config)
+            transformer = DateTimeDeidentifier(
+                idconfig=self.idconfig,
+                global_deid_config=deid_config,
+                datetime_column="datetime_col",
+                uid=f"test_{method}",
+            )
+
+            # Create original data
+            original_df = pd.DataFrame(
+                {
+                    "patient_id": [1],
+                    "datetime_col": [datetime(2023, 1, 1)],
+                }
+            )
+
+            # Transform
+            deid_ref_dict = {}
+            transformed_df, deid_ref_dict = transformer.transform(
+                original_df, deid_ref_dict
+            )
+
+            # Reverse
+            reversed_df, _ = transformer.reverse(transformed_df, deid_ref_dict)
+
+            # Check restoration (within reasonable precision)
+            original_time = original_df["datetime_col"].iloc[0]
+            reversed_time = reversed_df["datetime_col"].iloc[0]
+            time_diff = abs((original_time - reversed_time).total_seconds())
+            # Should be very close (within 1 second tolerance)
+            assert time_diff < 1
+
+    def test_reverse_round_trip_consistency(self):
+        """Test that transform -> reverse -> transform maintains consistency."""
+        original_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3, 1, 2],  # Duplicates
+                "datetime_col": [
+                    datetime(2023, 1, 1),
+                    datetime(2023, 1, 2),
+                    datetime(2023, 1, 3),
+                    datetime(2023, 1, 4),
+                    datetime(2023, 1, 5),
+                ],
+            }
+        )
+
+        deid_ref_dict = {}
+
+        # Transform
+        transformed_df, deid_ref_dict = self.transformer.transform(
+            original_df, deid_ref_dict
+        )
+
+        # Reverse
+        reversed_df, deid_ref_dict = self.transformer.reverse(
+            transformed_df, deid_ref_dict
+        )
+
+        # Transform again
+        retransformed_df, _ = self.transformer.transform(reversed_df, deid_ref_dict)
+
+        # Check that second transformation produces same result as first
+        pd.testing.assert_frame_equal(
+            transformed_df[["patient_id", "datetime_col"]],
+            retransformed_df[["patient_id", "datetime_col"]],
+            check_dtype=False,
+        )
+
+    def test_reverse_preserves_other_columns(self):
+        """Test reverse preserves other columns unchanged."""
+        shifted_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    datetime(2023, 1, 6),
+                    datetime(2023, 1, 12),
+                    datetime(2023, 1, 18),
+                ],
+                "other_col": ["A", "B", "C"],
+                "numeric_col": [10, 20, 30],
+            }
+        )
+
+        timeshift_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [1, 2, 3],
+                self.transformer._timeshift_key(): [5, 10, 15],
+            }
+        )
+        deid_ref_dict = {self.transformer._timeshift_key(): timeshift_df}
+
+        reversed_df, _ = self.transformer.reverse(shifted_df, deid_ref_dict)
+
+        # Check other columns are preserved
+        pd.testing.assert_series_equal(
+            reversed_df["other_col"], shifted_df["other_col"]
+        )
+        pd.testing.assert_series_equal(
+            reversed_df["numeric_col"], shifted_df["numeric_col"]
+        )
+
+    def test_reverse_with_string_datetime_values(self):
+        """Test reverse works with string datetime values."""
+        shifted_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2],
+                "datetime_col": ["2023-01-06", "2023-01-12"],  # String format
+            }
+        )
+
+        timeshift_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [1, 2],
+                self.transformer._timeshift_key(): [5, 10],
+            }
+        )
+        deid_ref_dict = {self.transformer._timeshift_key(): timeshift_df}
+
+        reversed_df, _ = self.transformer.reverse(shifted_df, deid_ref_dict)
+
+        # Check that values are reversed (converted to datetime and shifted back)
+        assert len(reversed_df) == 2
+        assert pd.api.types.is_datetime64_any_dtype(reversed_df["datetime_col"])
+
+    def test_reverse_with_missing_uid_column_in_timeshift_df(self):
+        """Test reverse raises error when UID column is missing in timeshift_df."""
+        shifted_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    datetime(2023, 1, 6),
+                    datetime(2023, 1, 12),
+                    datetime(2023, 1, 18),
+                ],
+            }
+        )
+
+        # Timeshift_df missing UID column
+        timeshift_df = pd.DataFrame(
+            {
+                self.transformer._timeshift_key(): [5, 10, 15],  # Missing uid column
+            }
+        )
+        deid_ref_dict = {self.transformer._timeshift_key(): timeshift_df}
+
+        with pytest.raises(
+            ValueError,
+            match=f"UID column '{self.idconfig.uid}' not found in timeshift_df",
+        ):
+            self.transformer.reverse(shifted_df, deid_ref_dict)
+
+    def test_reverse_with_missing_shift_column_in_timeshift_df(self):
+        """Test reverse raises error when shift column is missing in timeshift_df."""
+        shifted_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    datetime(2023, 1, 6),
+                    datetime(2023, 1, 12),
+                    datetime(2023, 1, 18),
+                ],
+            }
+        )
+
+        # Timeshift_df missing shift column
+        timeshift_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [1, 2, 3],  # Missing shift column
+            }
+        )
+        deid_ref_dict = {self.transformer._timeshift_key(): timeshift_df}
+
+        with pytest.raises(
+            ValueError,
+            match=f"Shift column '{self.transformer._timeshift_key()}' not found in timeshift_df",
+        ):
+            self.transformer.reverse(shifted_df, deid_ref_dict)

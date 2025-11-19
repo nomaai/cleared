@@ -158,6 +158,9 @@ class TestTransformerRegistryIntegration:
             ):
                 return df.copy(), deid_ref_dict.copy()
 
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
+                return df.copy(), deid_ref_dict.copy()
+
         custom_transformers = {"CustomTransformer": CustomTransformer}
         registry = TransformerRegistry(
             use_defaults=True, custom_transformers=custom_transformers
@@ -197,6 +200,9 @@ class TestTransformerRegistryIntegration:
             def transform(
                 self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
             ):
+                return df.copy(), deid_ref_dict.copy()
+
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
                 return df.copy(), deid_ref_dict.copy()
 
         registry.register("TestTransformer", TestTransformer)
@@ -256,6 +262,9 @@ class TestTransformerRegistryIntegration:
             ):
                 return df.copy(), deid_ref_dict.copy()
 
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
+                return df.copy(), deid_ref_dict.copy()
+
         # Register many transformers
         for i in range(100):
             registry.register(f"Transformer{i}", TestTransformer)
@@ -279,6 +288,9 @@ class TestTransformerRegistryIntegration:
             def transform(
                 self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
             ):
+                return df.copy(), deid_ref_dict.copy()
+
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
                 return df.copy(), deid_ref_dict.copy()
 
         class DerivedTransformer(BaseCustomTransformer):

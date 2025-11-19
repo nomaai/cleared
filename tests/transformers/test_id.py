@@ -687,3 +687,459 @@ class TestIDDeidentifierPerformance:
             result_deid_ref_dict[idconfig.uid].memory_usage(deep=True).sum()
             < 50 * 1024 * 1024
         )  # Less than 50MB
+
+
+class TestIDDeidentifierReverse:
+    """Comprehensive tests for IDDeidentifier reverse functionality."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        # Use different name and uid to avoid pandas merge suffix issues when columns have same name
+        self.idconfig = IdentifierConfig(
+            name="patient_id", uid="patient_uid", description="Patient identifier"
+        )
+        self.transformer = IDDeidentifier(self.idconfig)
+
+    def test_reverse_success(self):
+        """Test successful reverse operation restores original ID values."""
+        # Create original data with string IDs to ensure transformation is visible
+        original_df = pd.DataFrame(
+            {
+                "patient_id": [
+                    "user_001",
+                    "user_002",
+                    "user_003",
+                    "user_001",
+                    "user_002",
+                ],  # Repeated values
+                "name": ["Alice", "Bob", "Charlie", "Alice", "Bob"],
+            }
+        )
+
+        # First, transform the data
+        deid_ref_dict = {}
+        transformed_df, deid_ref_dict = self.transformer.transform(
+            original_df, deid_ref_dict
+        )
+
+        # Verify transformation occurred (strings converted to integers)
+        assert not transformed_df["patient_id"].equals(original_df["patient_id"])
+        assert all(
+            isinstance(val, (int, np.integer)) for val in transformed_df["patient_id"]
+        )
+
+        # Now reverse the transformation
+        reversed_df, _ = self.transformer.reverse(transformed_df, deid_ref_dict)
+
+        # Check that ID values are restored
+        pd.testing.assert_series_equal(
+            reversed_df["patient_id"], original_df["patient_id"]
+        )
+        pd.testing.assert_series_equal(reversed_df["name"], original_df["name"])
+
+    def test_reverse_with_existing_deid_mappings(self):
+        """Test reverse with pre-existing deid mappings in deid_ref_dict."""
+        # Create de-identified data (simulating already transformed data)
+        # Note: In reverse, the column still has the same name but contains de-identified values
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],  # De-identified values (integers)
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
+
+        # Create deid mappings (original values are strings, de-identified are integers)
+        deid_ref_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [
+                    "user_001",
+                    "user_002",
+                    "user_003",
+                ],  # Original values
+                self.idconfig.deid_uid(): [1, 2, 3],  # De-identified values
+            }
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df}
+
+        # Reverse the transformation
+        reversed_df, _ = self.transformer.reverse(deid_df, deid_ref_dict)
+
+        # Check that values are restored correctly
+        expected_df = pd.DataFrame(
+            {
+                "patient_id": [
+                    "user_001",
+                    "user_002",
+                    "user_003",
+                ],  # Original values restored
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
+
+        pd.testing.assert_frame_equal(
+            reversed_df[["patient_id", "name"]], expected_df[["patient_id", "name"]]
+        )
+
+    def test_reverse_missing_deid_mappings_raises_error(self):
+        """Test reverse raises error when deid mappings are missing."""
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],  # De-identified values
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
+
+        # Empty deid_ref_dict (no deid mappings)
+        deid_ref_dict = {}
+
+        with pytest.raises(
+            ValueError,
+            match=f"De-identification reference not found for transformer {self.transformer.uid}",
+        ):
+            self.transformer.reverse(deid_df, deid_ref_dict)
+
+    def test_reverse_missing_column_raises_error(self):
+        """Test reverse raises error when patient_id column is missing."""
+        deid_df = pd.DataFrame(
+            {
+                "other_id": [1, 2, 3],  # Wrong column name
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
+
+        deid_ref_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [10, 20, 30],
+                self.idconfig.deid_uid(): [1, 2, 3],
+            }
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df}
+
+        with pytest.raises(
+            ValueError, match="Column 'patient_id' not found in DataFrame"
+        ):
+            self.transformer.reverse(deid_df, deid_ref_dict)
+
+    def test_reverse_incomplete_mappings_raises_error(self):
+        """Test reverse raises error when some values don't have mappings."""
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3, 4],  # 4 values
+                "name": ["Alice", "Bob", "Charlie", "Diana"],
+            }
+        )
+
+        # Deid mappings with only 3 values (missing 4)
+        deid_ref_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [10, 20, 30],
+                self.idconfig.deid_uid(): [1, 2, 3],
+            }
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df}
+
+        with pytest.raises(
+            ValueError,
+            match="Some values in 'patient_id' don't have deid mappings",
+        ):
+            self.transformer.reverse(deid_df, deid_ref_dict)
+
+    def test_reverse_empty_dataframe(self):
+        """Test reverse with empty DataFrame."""
+        # Create empty DataFrame with proper dtypes
+        empty_df = pd.DataFrame(
+            {"patient_id": pd.Series(dtype="int64"), "name": pd.Series(dtype="str")}
+        )
+        deid_ref_df = pd.DataFrame(
+            columns=[self.idconfig.uid, self.idconfig.deid_uid()]
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df}
+
+        reversed_df, _ = self.transformer.reverse(empty_df, deid_ref_dict)
+
+        assert len(reversed_df) == 0
+        assert "patient_id" in reversed_df.columns
+        assert "name" in reversed_df.columns
+
+    def test_reverse_preserves_other_columns(self):
+        """Test reverse preserves other columns unchanged."""
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],  # De-identified values
+                "name": ["Alice", "Bob", "Charlie"],
+                "age": [25, 30, 35],
+                "city": ["NYC", "LA", "SF"],
+            }
+        )
+
+        deid_ref_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [10, 20, 30],  # Original values
+                self.idconfig.deid_uid(): [1, 2, 3],  # De-identified values
+            }
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df}
+
+        reversed_df, _ = self.transformer.reverse(deid_df, deid_ref_dict)
+
+        # Check other columns are preserved
+        pd.testing.assert_series_equal(reversed_df["name"], deid_df["name"])
+        pd.testing.assert_series_equal(reversed_df["age"], deid_df["age"])
+        pd.testing.assert_series_equal(reversed_df["city"], deid_df["city"])
+
+    def test_reverse_round_trip_consistency(self):
+        """Test that transform -> reverse -> transform maintains consistency."""
+        # Use string IDs to ensure transformation is visible
+        original_df = pd.DataFrame(
+            {
+                "patient_id": [
+                    "user_001",
+                    "user_002",
+                    "user_003",
+                    "user_001",
+                    "user_002",
+                ],  # Duplicates
+                "name": ["Alice", "Bob", "Charlie", "Alice", "Bob"],
+            }
+        )
+
+        deid_ref_dict = {}
+
+        # Transform
+        transformed_df, deid_ref_dict = self.transformer.transform(
+            original_df, deid_ref_dict
+        )
+
+        # Reverse
+        reversed_df, deid_ref_dict = self.transformer.reverse(
+            transformed_df, deid_ref_dict
+        )
+
+        # Transform again
+        retransformed_df, _ = self.transformer.transform(reversed_df, deid_ref_dict)
+
+        # Check that second transformation produces same result as first
+        pd.testing.assert_series_equal(
+            transformed_df["patient_id"], retransformed_df["patient_id"]
+        )
+
+    def test_reverse_with_string_ids(self):
+        """Test reverse works with string ID values."""
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],  # De-identified integer values
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
+
+        # Original values were strings
+        deid_ref_df = pd.DataFrame(
+            {
+                self.idconfig.uid: ["user_001", "user_002", "user_003"],
+                self.idconfig.deid_uid(): [1, 2, 3],
+            }
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df}
+
+        reversed_df, _ = self.transformer.reverse(deid_df, deid_ref_dict)
+
+        # Check that string values are restored
+        expected_values = ["user_001", "user_002", "user_003"]
+        assert list(reversed_df["patient_id"]) == expected_values
+
+    def test_reverse_with_missing_deid_column_in_deid_ref_df(self):
+        """Test reverse raises error when deid column is missing in deid_ref_df."""
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
+
+        # Deid_ref_df missing deid column
+        deid_ref_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [10, 20, 30],  # Missing deid_uid column
+            }
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df}
+
+        with pytest.raises(
+            ValueError,
+            match=f"Deid column '{self.idconfig.deid_uid()}' not found in deid_ref_df",
+        ):
+            self.transformer.reverse(deid_df, deid_ref_dict)
+
+    def test_reverse_with_missing_uid_column_in_deid_ref_df(self):
+        """Test reverse raises error when UID column is missing in deid_ref_df."""
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
+
+        # Deid_ref_df missing UID column
+        deid_ref_df = pd.DataFrame(
+            {
+                self.idconfig.deid_uid(): [1, 2, 3],  # Missing uid column
+            }
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df}
+
+        with pytest.raises(
+            ValueError,
+            match=f"UID column '{self.idconfig.uid}' not found in deid_ref_df",
+        ):
+            self.transformer.reverse(deid_df, deid_ref_dict)
+
+    def test_reverse_with_duplicate_deid_values(self):
+        """Test reverse handles duplicate de-identified values correctly."""
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 1, 2, 2, 3],  # Duplicate de-identified values
+                "name": ["Alice", "Alice2", "Bob", "Bob2", "Charlie"],
+            }
+        )
+
+        deid_ref_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [10, 20, 30],  # Original values
+                self.idconfig.deid_uid(): [1, 2, 3],  # De-identified values
+            }
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df}
+
+        reversed_df, _ = self.transformer.reverse(deid_df, deid_ref_dict)
+
+        # Check that duplicates are handled correctly
+        # Both rows with deid value 1 should map to original value 10
+        assert reversed_df[reversed_df["patient_id"] == 10].shape[0] == 2
+        assert reversed_df[reversed_df["patient_id"] == 20].shape[0] == 2
+        assert reversed_df[reversed_df["patient_id"] == 30].shape[0] == 1
+
+    def test_reverse_preserves_dataframe_index(self):
+        """Test that reverse preserves DataFrame structure."""
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "name": ["Alice", "Bob", "Charlie"],
+            },
+            index=["a", "b", "c"],
+        )
+
+        deid_ref_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [10, 20, 30],
+                self.idconfig.deid_uid(): [1, 2, 3],
+            }
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df}
+
+        reversed_df, _ = self.transformer.reverse(deid_df, deid_ref_dict)
+
+        # Check that data is preserved (index may change due to merge)
+        assert len(reversed_df) == 3
+        assert "patient_id" in reversed_df.columns
+        assert "name" in reversed_df.columns
+
+    def test_reverse_with_large_dataset(self):
+        """Test reverse with large dataset."""
+        n_values = 1000
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": range(1, n_values + 1),  # De-identified values
+                "name": [f"User_{i}" for i in range(n_values)],
+            }
+        )
+
+        deid_ref_df = pd.DataFrame(
+            {
+                self.idconfig.uid: range(1000, 1000 + n_values),  # Original values
+                self.idconfig.deid_uid(): range(
+                    1, n_values + 1
+                ),  # De-identified values
+            }
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df}
+
+        reversed_df, _ = self.transformer.reverse(deid_df, deid_ref_dict)
+
+        assert len(reversed_df) == n_values
+        assert all(
+            val in range(1000, 1000 + n_values) for val in reversed_df["patient_id"]
+        )
+
+    def test_reverse_with_special_characters_in_original_ids(self):
+        """Test reverse with special characters in original ID values."""
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],  # De-identified values
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
+
+        # Original values contain special characters
+        deid_ref_df = pd.DataFrame(
+            {
+                self.idconfig.uid: ["id@123", "user#456", "test$789"],
+                self.idconfig.deid_uid(): [1, 2, 3],
+            }
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df}
+
+        reversed_df, _ = self.transformer.reverse(deid_df, deid_ref_dict)
+
+        expected_values = ["id@123", "user#456", "test$789"]
+        assert list(reversed_df["patient_id"]) == expected_values
+
+    def test_reverse_with_unicode_ids(self):
+        """Test reverse with unicode ID values."""
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
+
+        # Original values are unicode
+        deid_ref_df = pd.DataFrame(
+            {
+                self.idconfig.uid: ["用户001", "user_002", "пользователь_003"],
+                self.idconfig.deid_uid(): [1, 2, 3],
+            }
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df}
+
+        reversed_df, _ = self.transformer.reverse(deid_df, deid_ref_dict)
+
+        expected_values = ["用户001", "user_002", "пользователь_003"]
+        assert list(reversed_df["patient_id"]) == expected_values
+
+    def test_reverse_does_not_modify_deid_ref_dict(self):
+        """Test reverse does not modify the deid_ref_dict."""
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
+
+        deid_ref_df = pd.DataFrame(
+            {
+                self.idconfig.uid: [10, 20, 30],
+                self.idconfig.deid_uid(): [1, 2, 3],
+            }
+        )
+        deid_ref_dict = {self.idconfig.uid: deid_ref_df.copy()}
+        original_deid_ref_dict = {self.idconfig.uid: deid_ref_df.copy()}
+
+        _reversed_df, updated_deid_ref_dict = self.transformer.reverse(
+            deid_df, deid_ref_dict
+        )
+
+        # Check that deid_ref_dict is unchanged (reverse doesn't update it)
+        pd.testing.assert_frame_equal(
+            updated_deid_ref_dict[self.idconfig.uid],
+            original_deid_ref_dict[self.idconfig.uid],
+        )

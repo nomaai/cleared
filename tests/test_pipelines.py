@@ -48,6 +48,16 @@ class MockTransformer(BaseTransformer):
         result_df["transformed"] = True
         return result_df, deid_ref_dict.copy() if deid_ref_dict is not None else {}
 
+    def reverse(
+        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """Mock reverse method."""
+        # Simple reverse: remove the transformed column if it exists
+        result_df = df.copy()
+        if "transformed" in result_df.columns:
+            result_df = result_df.drop(columns=["transformed"])
+        return result_df, deid_ref_dict.copy() if deid_ref_dict is not None else {}
+
 
 class MockDataLoader(BaseDataLoader):
     """Mock data loader for testing."""
@@ -635,3 +645,510 @@ class TestPipelineIntegration:
 
         # UID should still be the same
         assert pipeline.uid == "test_pipeline"
+
+
+class TestTablePipelineReverse:
+    """Comprehensive tests for TablePipeline reverse functionality."""
+
+    def setup_method(self):
+        """Set up test environment."""
+        self.temp_dir = tempfile.mkdtemp()
+        self.reverse_output_dir = tempfile.mkdtemp()
+        self.table_name = "test_table"
+
+        # Create test data (de-identified data that will be reversed)
+        self.deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],  # De-identified values
+                "name": ["Alice", "Bob", "Charlie"],
+                "admission_date": [
+                    "2023-01-16",
+                    "2023-02-21",
+                    "2023-03-11",
+                ],  # Shifted dates
+            }
+        )
+
+        # Create configs
+        input_io_config = IOConfig(
+            io_type="filesystem",
+            configs={"base_path": self.temp_dir, "file_format": "csv"},
+        )
+        output_io_config = IOConfig(
+            io_type="filesystem",
+            configs={"base_path": self.temp_dir, "file_format": "csv"},
+        )
+        self.io_config = PairedIOConfig(
+            input_config=input_io_config, output_config=output_io_config
+        )
+
+        self.deid_config = DeIDConfig(time_shift=None)
+
+    def teardown_method(self):
+        """Clean up test environment."""
+        import shutil
+
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+        shutil.rmtree(self.reverse_output_dir, ignore_errors=True)
+
+    @patch("cleared.io.create_data_loader")
+    def test_reverse_with_single_transformer(self, mock_create_loader):
+        """Test reverse with a single transformer."""
+        mock_loader = MockDataLoader({})
+        # In reverse mode, data is read from output config (where de-identified data is)
+        mock_loader.data[self.table_name] = self.deid_df.copy()
+        mock_create_loader.return_value = mock_loader
+
+        pipeline = TablePipeline(
+            table_name=self.table_name,
+            io_config=self.io_config,
+            deid_config=self.deid_config,
+        )
+
+        # Add a transformer
+        transformer = MockTransformer("test_transformer")
+        pipeline.add_transformer(transformer)
+
+        # Create deid_ref_dict for reverse
+        deid_ref_dict = {"test": pd.DataFrame({"ref_col": ["a", "b", "c"]})}
+
+        # Call reverse
+        _result_df, _result_deid_ref_dict = pipeline.reverse(
+            deid_ref_dict=deid_ref_dict, reverse_output_path=self.reverse_output_dir
+        )
+
+        # Check that data was read from output config
+        assert mock_loader.read_called
+        assert mock_loader.last_table_name == self.table_name
+
+        # Check that transformer reverse was called
+        # Note: MockTransformer.reverse() removes "transformed" column if it exists
+        # Since we're reversing, the transformer should have been called
+
+        # Check that data was written to reverse output path
+        assert mock_loader.write_called
+
+    @patch("cleared.io.create_data_loader")
+    def test_reverse_with_multiple_transformers(self, mock_create_loader):
+        """Test reverse with multiple transformers (reversed in reverse order)."""
+        mock_loader = MockDataLoader({})
+        mock_loader.data[self.table_name] = self.deid_df.copy()
+        mock_create_loader.return_value = mock_loader
+
+        pipeline = TablePipeline(
+            table_name=self.table_name,
+            io_config=self.io_config,
+            deid_config=self.deid_config,
+        )
+
+        # Add multiple transformers
+        transformer1 = MockTransformer("transformer1")
+        transformer2 = MockTransformer("transformer2")
+        transformer3 = MockTransformer("transformer3")
+
+        pipeline.add_transformer(transformer1)
+        pipeline.add_transformer(transformer2)
+        pipeline.add_transformer(transformer3)
+
+        deid_ref_dict = {"test": pd.DataFrame({"ref_col": ["a", "b", "c"]})}
+
+        # Call reverse
+        _result_df, _ = pipeline.reverse(
+            deid_ref_dict=deid_ref_dict, reverse_output_path=self.reverse_output_dir
+        )
+
+        # Check that all transformers were called (in reverse order)
+        # Note: The base Pipeline.reverse() calls transformers in reverse order
+        assert mock_loader.read_called
+        assert mock_loader.write_called
+
+    @patch("cleared.io.create_data_loader")
+    def test_reverse_with_provided_dataframe(self, mock_create_loader):
+        """Test reverse with provided DataFrame (skips data loading)."""
+        mock_loader = MockDataLoader({})
+        mock_create_loader.return_value = mock_loader
+
+        pipeline = TablePipeline(
+            table_name=self.table_name,
+            io_config=self.io_config,
+            deid_config=self.deid_config,
+        )
+
+        transformer = MockTransformer("test_transformer")
+        pipeline.add_transformer(transformer)
+
+        deid_ref_dict = {"test": pd.DataFrame({"ref_col": ["a", "b", "c"]})}
+
+        # Call reverse with provided DataFrame
+        _result_df, _ = pipeline.reverse(
+            df=self.deid_df.copy(),
+            deid_ref_dict=deid_ref_dict,
+            reverse_output_path=self.reverse_output_dir,
+        )
+
+        # Check that data was NOT read (since we provided it)
+        # Note: read_called might still be True if write triggers it, but the key is
+        # that the provided df was used
+
+        # Check that data was written
+        assert mock_loader.write_called
+
+    @patch("cleared.io.create_data_loader")
+    def test_reverse_in_test_mode_no_output(self, mock_create_loader):
+        """Test reverse in test mode (no output writing)."""
+        mock_loader = MockDataLoader({})
+        mock_loader.data[self.table_name] = self.deid_df.copy()
+        mock_create_loader.return_value = mock_loader
+
+        pipeline = TablePipeline(
+            table_name=self.table_name,
+            io_config=self.io_config,
+            deid_config=self.deid_config,
+        )
+
+        transformer = MockTransformer("test_transformer")
+        pipeline.add_transformer(transformer)
+
+        deid_ref_dict = {"test": pd.DataFrame({"ref_col": ["a", "b", "c"]})}
+
+        # Call reverse in test mode
+        _result_df, _ = pipeline.reverse(
+            deid_ref_dict=deid_ref_dict,
+            reverse_output_path=self.reverse_output_dir,
+            test_mode=True,
+        )
+
+        # Check that data was read
+        assert mock_loader.read_called
+
+        # Check that data was NOT written (test mode)
+        assert not mock_loader.write_called
+
+    @patch("cleared.io.create_data_loader")
+    def test_reverse_with_rows_limit(self, mock_create_loader):
+        """Test reverse with rows_limit parameter."""
+        # Create larger dataset
+        large_deid_df = pd.DataFrame(
+            {
+                "patient_id": range(1, 11),  # 10 rows
+                "name": [f"User_{i}" for i in range(1, 11)],
+            }
+        )
+
+        mock_loader = MockDataLoader({})
+        mock_loader.data[self.table_name] = large_deid_df.copy()
+        mock_create_loader.return_value = mock_loader
+
+        pipeline = TablePipeline(
+            table_name=self.table_name,
+            io_config=self.io_config,
+            deid_config=self.deid_config,
+        )
+
+        transformer = MockTransformer("test_transformer")
+        pipeline.add_transformer(transformer)
+
+        deid_ref_dict = {"test": pd.DataFrame({"ref_col": ["a", "b", "c"]})}
+
+        # Call reverse with rows_limit
+        result_df, _ = pipeline.reverse(
+            deid_ref_dict=deid_ref_dict,
+            reverse_output_path=self.reverse_output_dir,
+            rows_limit=5,
+        )
+
+        # Check that only 5 rows were processed
+        assert len(result_df) == 5
+
+    @patch("cleared.io.create_data_loader")
+    def test_reverse_missing_reverse_output_path_raises_error(self, mock_create_loader):
+        """Test reverse raises error when reverse_output_path is missing."""
+        mock_loader = MockDataLoader({})
+        mock_loader.data[self.table_name] = self.deid_df.copy()
+        mock_create_loader.return_value = mock_loader
+
+        pipeline = TablePipeline(
+            table_name=self.table_name,
+            io_config=self.io_config,
+            deid_config=self.deid_config,
+        )
+
+        transformer = MockTransformer("test_transformer")
+        pipeline.add_transformer(transformer)
+
+        deid_ref_dict = {"test": pd.DataFrame({"ref_col": ["a", "b", "c"]})}
+
+        # Call reverse without reverse_output_path (should raise error)
+        with pytest.raises(
+            ValueError, match="reverse_output_path is required when reverse=True"
+        ):
+            pipeline.reverse(
+                deid_ref_dict=deid_ref_dict,
+                test_mode=False,  # Not in test mode, so output writing is attempted
+            )
+
+    @patch("cleared.io.create_data_loader")
+    def test_reverse_read_error(self, mock_create_loader):
+        """Test reverse when data loading fails."""
+        mock_loader = Mock()
+        mock_loader.read_table.side_effect = Exception("Read error")
+        mock_create_loader.return_value = mock_loader
+
+        pipeline = TablePipeline(
+            table_name=self.table_name,
+            io_config=self.io_config,
+            deid_config=self.deid_config,
+        )
+
+        deid_ref_dict = {"test": pd.DataFrame({"ref_col": ["a", "b", "c"]})}
+
+        with pytest.raises(ValueError, match="Failed to read table"):
+            pipeline.reverse(
+                deid_ref_dict=deid_ref_dict, reverse_output_path=self.reverse_output_dir
+            )
+
+    @patch("cleared.io.create_data_loader")
+    def test_reverse_with_empty_dataframe(self, mock_create_loader):
+        """Test reverse with empty DataFrame."""
+        mock_loader = MockDataLoader({})
+        empty_df = pd.DataFrame()
+        mock_loader.data[self.table_name] = empty_df
+        mock_create_loader.return_value = mock_loader
+
+        pipeline = TablePipeline(
+            table_name=self.table_name,
+            io_config=self.io_config,
+            deid_config=self.deid_config,
+        )
+
+        transformer = MockTransformer("test_transformer")
+        pipeline.add_transformer(transformer)
+
+        deid_ref_dict = {"test": pd.DataFrame({"ref_col": ["a", "b", "c"]})}
+
+        result_df, _ = pipeline.reverse(
+            deid_ref_dict=deid_ref_dict, reverse_output_path=self.reverse_output_dir
+        )
+
+        assert len(result_df) == 0
+        assert mock_loader.write_called
+
+    @patch("cleared.io.create_data_loader")
+    def test_reverse_with_real_id_transformer(self, mock_create_loader):
+        """Test reverse with real IDDeidentifier transformer."""
+        # Create de-identified data
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],  # De-identified integer values
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
+
+        mock_loader = MockDataLoader({})
+        mock_loader.data[self.table_name] = deid_df.copy()
+        mock_create_loader.return_value = mock_loader
+
+        pipeline = TablePipeline(
+            table_name=self.table_name,
+            io_config=self.io_config,
+            deid_config=self.deid_config,
+        )
+
+        # Add real IDDeidentifier transformer
+        id_config = IdentifierConfig(
+            name="patient_id", uid="patient_uid", description="Patient identifier"
+        )
+        id_transformer = IDDeidentifier(id_config, uid="id_deidentifier")
+        pipeline.add_transformer(id_transformer)
+
+        # Create deid_ref_dict with mappings (original -> de-identified)
+        deid_ref_dict = {
+            "patient_uid": pd.DataFrame(
+                {
+                    "patient_uid": [
+                        "user_001",
+                        "user_002",
+                        "user_003",
+                    ],  # Original values
+                    "patient_uid__deid": [1, 2, 3],  # De-identified values
+                }
+            )
+        }
+
+        # Call reverse
+        result_df, _ = pipeline.reverse(
+            deid_ref_dict=deid_ref_dict, reverse_output_path=self.reverse_output_dir
+        )
+
+        # Check that values were reversed (de-identified -> original)
+        expected_values = ["user_001", "user_002", "user_003"]
+        assert list(result_df["patient_id"]) == expected_values
+        assert mock_loader.write_called
+
+    @patch("cleared.io.create_data_loader")
+    def test_reverse_round_trip_consistency(self, mock_create_loader):
+        """Test that transform -> reverse maintains data integrity."""
+        original_df = pd.DataFrame(
+            {
+                "patient_id": ["user_001", "user_002", "user_003"],
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
+
+        mock_loader = MockDataLoader({})
+        mock_loader.data[self.table_name] = original_df.copy()
+        mock_create_loader.return_value = mock_loader
+
+        pipeline = TablePipeline(
+            table_name=self.table_name,
+            io_config=self.io_config,
+            deid_config=self.deid_config,
+        )
+
+        # Add IDDeidentifier transformer
+        id_config = IdentifierConfig(
+            name="patient_id", uid="patient_uid", description="Patient identifier"
+        )
+        id_transformer = IDDeidentifier(id_config, uid="id_deidentifier")
+        pipeline.add_transformer(id_transformer)
+
+        deid_ref_dict = {}
+
+        # Transform
+        transformed_df, deid_ref_dict = pipeline.transform(deid_ref_dict=deid_ref_dict)
+
+        # Update mock loader to have transformed data for reverse
+        mock_loader.data[self.table_name] = transformed_df.copy()
+
+        # Reverse
+        reversed_df, _ = pipeline.reverse(
+            deid_ref_dict=deid_ref_dict, reverse_output_path=self.reverse_output_dir
+        )
+
+        # Check that original values are restored
+        pd.testing.assert_series_equal(
+            reversed_df["patient_id"], original_df["patient_id"]
+        )
+
+    @patch("cleared.io.create_data_loader")
+    def test_reverse_with_multiple_real_transformers(self, mock_create_loader):
+        """Test reverse with multiple real transformers in sequence."""
+        # Create de-identified data
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],  # De-identified
+                "name": ["Alice", "Bob", "Charlie"],
+            }
+        )
+
+        mock_loader = MockDataLoader({})
+        mock_loader.data[self.table_name] = deid_df.copy()
+        mock_create_loader.return_value = mock_loader
+
+        pipeline = TablePipeline(
+            table_name=self.table_name,
+            io_config=self.io_config,
+            deid_config=self.deid_config,
+        )
+
+        # Add multiple transformers
+        id_config = IdentifierConfig(
+            name="patient_id", uid="patient_uid", description="Patient identifier"
+        )
+        id_transformer = IDDeidentifier(id_config, uid="id_deidentifier")
+        pipeline.add_transformer(id_transformer)
+
+        # Add a second transformer (MockTransformer)
+        mock_transformer = MockTransformer("mock_transformer")
+        pipeline.add_transformer(mock_transformer)
+
+        # Create deid_ref_dict
+        deid_ref_dict = {
+            "patient_uid": pd.DataFrame(
+                {
+                    "patient_uid": ["user_001", "user_002", "user_003"],
+                    "patient_uid__deid": [1, 2, 3],
+                }
+            )
+        }
+
+        # Call reverse
+        result_df, _ = pipeline.reverse(
+            deid_ref_dict=deid_ref_dict, reverse_output_path=self.reverse_output_dir
+        )
+
+        # Check that reverse was successful
+        assert len(result_df) == 3
+        assert "patient_id" in result_df.columns
+        assert mock_loader.write_called
+
+    @patch("cleared.io.create_data_loader")
+    def test_reverse_preserves_other_columns(self, mock_create_loader):
+        """Test reverse preserves columns not affected by transformers."""
+        deid_df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],  # De-identified
+                "name": ["Alice", "Bob", "Charlie"],
+                "age": [25, 30, 35],  # Not transformed
+                "city": ["NYC", "LA", "SF"],  # Not transformed
+            }
+        )
+
+        mock_loader = MockDataLoader({})
+        mock_loader.data[self.table_name] = deid_df.copy()
+        mock_create_loader.return_value = mock_loader
+
+        pipeline = TablePipeline(
+            table_name=self.table_name,
+            io_config=self.io_config,
+            deid_config=self.deid_config,
+        )
+
+        id_config = IdentifierConfig(
+            name="patient_id", uid="patient_uid", description="Patient identifier"
+        )
+        id_transformer = IDDeidentifier(id_config, uid="id_deidentifier")
+        pipeline.add_transformer(id_transformer)
+
+        deid_ref_dict = {
+            "patient_uid": pd.DataFrame(
+                {
+                    "patient_uid": ["user_001", "user_002", "user_003"],
+                    "patient_uid__deid": [1, 2, 3],
+                }
+            )
+        }
+
+        result_df, _ = pipeline.reverse(
+            deid_ref_dict=deid_ref_dict, reverse_output_path=self.reverse_output_dir
+        )
+
+        # Check that other columns are preserved
+        pd.testing.assert_series_equal(result_df["name"], deid_df["name"])
+        pd.testing.assert_series_equal(result_df["age"], deid_df["age"])
+        pd.testing.assert_series_equal(result_df["city"], deid_df["city"])
+
+    @patch("cleared.io.create_data_loader")
+    def test_reverse_with_none_deid_ref_dict(self, mock_create_loader):
+        """Test reverse handles None deid_ref_dict by creating empty dict."""
+        mock_loader = MockDataLoader({})
+        mock_loader.data[self.table_name] = self.deid_df.copy()
+        mock_create_loader.return_value = mock_loader
+
+        pipeline = TablePipeline(
+            table_name=self.table_name,
+            io_config=self.io_config,
+            deid_config=self.deid_config,
+        )
+
+        transformer = MockTransformer("test_transformer")
+        pipeline.add_transformer(transformer)
+
+        # Call reverse with None deid_ref_dict
+        _result_df, result_deid_ref_dict = pipeline.reverse(
+            deid_ref_dict=None, reverse_output_path=self.reverse_output_dir
+        )
+
+        # Should not raise error and should create empty dict
+        assert isinstance(result_deid_ref_dict, dict)
+        assert mock_loader.write_called

@@ -1604,3 +1604,546 @@ class TestClearedEngineEdgeCases:
         # Mixed column should remain as object due to non-numeric values
         assert result["mixed"].dtype == "object"
         assert result["pure_text"].dtype == "object"
+
+
+class TestClearedEngineReverse:
+    """Comprehensive tests for ClearedEngine reverse functionality."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.valid_io_config = ClearedIOConfig(
+            data=PairedIOConfig(
+                input_config=IOConfig(
+                    io_type="filesystem", configs={"base_path": "/tmp/input"}
+                ),
+                output_config=IOConfig(
+                    io_type="filesystem", configs={"base_path": "/tmp/output"}
+                ),
+            ),
+            deid_ref=PairedIOConfig(
+                input_config=IOConfig(
+                    io_type="filesystem", configs={"base_path": "/tmp/deid_input"}
+                ),
+                output_config=IOConfig(
+                    io_type="filesystem", configs={"base_path": "/tmp/deid_output"}
+                ),
+            ),
+            runtime_io_path="/tmp/runtime",
+        )
+
+        self.valid_deid_config = DeIDConfig(
+            time_shift=TimeShiftConfig(method="random_days", min=-365, max=365)
+        )
+
+        self.engine = ClearedEngine(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io_config=self.valid_io_config,
+        )
+
+        self.reverse_output_path = "/tmp/reverse_output"
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_reverse_with_single_pipeline(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test reverse with a single pipeline."""
+        # Setup mocks
+        mock_load_deid_ref.return_value = {"test_ref": pd.DataFrame({"id": [1, 2, 3]})}
+
+        mock_pipeline = Mock(spec=TablePipeline)
+        mock_pipeline.uid = "test_pipeline"
+        mock_pipeline.reverse.return_value = (
+            pd.DataFrame({"result": [1, 2, 3]}),
+            {"test_ref": pd.DataFrame({"id": [1, 2, 3]})},
+        )
+
+        self.engine.add_pipeline(mock_pipeline)
+
+        # Run engine in reverse mode
+        result = self.engine.run(
+            reverse=True, reverse_output_path=self.reverse_output_path
+        )
+
+        # Verify results
+        assert isinstance(result, Results)
+        assert result.success is True
+        assert "test_pipeline" in result.results
+        assert result.results["test_pipeline"].status == "success"
+        assert result.results["test_pipeline"].error is None
+        assert "test_pipeline" in result.execution_order
+
+        # Verify pipeline reverse was called correctly
+        call_args = mock_pipeline.reverse.call_args
+        assert call_args[1]["df"] is None
+        assert "test_ref" in call_args[1]["deid_ref_dict"]
+        assert call_args[1]["reverse_output_path"] == self.reverse_output_path
+
+        # Verify methods were called
+        mock_load_deid_ref.assert_called_once()
+        mock_save_results.assert_called_once()
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_reverse_with_multiple_pipelines(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test reverse with multiple pipelines."""
+        # Setup mocks
+        mock_load_deid_ref.return_value = {"test_ref": pd.DataFrame({"id": [1, 2, 3]})}
+
+        mock_pipeline1 = Mock(spec=TablePipeline)
+        mock_pipeline1.uid = "pipeline1"
+        mock_pipeline1.reverse.return_value = (
+            pd.DataFrame({"result1": [1, 2]}),
+            {"test_ref": pd.DataFrame({"id": [1, 2, 3]})},
+        )
+
+        mock_pipeline2 = Mock(spec=TablePipeline)
+        mock_pipeline2.uid = "pipeline2"
+        mock_pipeline2.reverse.return_value = (
+            pd.DataFrame({"result2": [3, 4]}),
+            {"test_ref": pd.DataFrame({"id": [1, 2, 3]})},
+        )
+
+        self.engine.add_pipeline(mock_pipeline1)
+        self.engine.add_pipeline(mock_pipeline2)
+
+        # Run engine in reverse mode
+        result = self.engine.run(
+            reverse=True, reverse_output_path=self.reverse_output_path
+        )
+
+        # Verify results
+        assert isinstance(result, Results)
+        assert result.success is True
+        assert len(result.results) == 2
+        assert "pipeline1" in result.results
+        assert "pipeline2" in result.results
+        assert result.results["pipeline1"].status == "success"
+        assert result.results["pipeline2"].status == "success"
+        assert result.execution_order == ["pipeline1", "pipeline2"]
+
+        # Verify pipelines were called in order
+        mock_pipeline1.reverse.assert_called_once()
+        mock_pipeline2.reverse.assert_called_once()
+
+        # Verify reverse_output_path was passed to both
+        assert (
+            mock_pipeline1.reverse.call_args[1]["reverse_output_path"]
+            == self.reverse_output_path
+        )
+        assert (
+            mock_pipeline2.reverse.call_args[1]["reverse_output_path"]
+            == self.reverse_output_path
+        )
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_reverse_in_test_mode(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test reverse in test mode (no output saving)."""
+        # Setup mocks
+        mock_load_deid_ref.return_value = {"test_ref": pd.DataFrame({"id": [1, 2, 3]})}
+
+        mock_pipeline = Mock(spec=TablePipeline)
+        mock_pipeline.uid = "test_pipeline"
+        mock_pipeline.reverse.return_value = (
+            pd.DataFrame({"result": [1, 2, 3]}),
+            {"test_ref": pd.DataFrame({"id": [1, 2, 3]})},
+        )
+
+        self.engine.add_pipeline(mock_pipeline)
+
+        # Run engine in reverse mode with test_mode
+        result = self.engine.run(
+            reverse=True,
+            reverse_output_path=self.reverse_output_path,
+            test_mode=True,
+        )
+
+        # Verify results
+        assert isinstance(result, Results)
+        assert result.success is True
+
+        # Verify that _save_results and _save_deid_ref_files were NOT called (test mode)
+        mock_save_results.assert_not_called()
+        mock_save_deid_ref.assert_not_called()
+
+        # Verify pipeline reverse was called with test_mode
+        call_args = mock_pipeline.reverse.call_args
+        assert call_args[1]["test_mode"] is True
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_reverse_with_rows_limit(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test reverse with rows_limit parameter."""
+        # Setup mocks
+        mock_load_deid_ref.return_value = {"test_ref": pd.DataFrame({"id": [1, 2, 3]})}
+
+        mock_pipeline = Mock(spec=TablePipeline)
+        mock_pipeline.uid = "test_pipeline"
+        # Return DataFrame with 5 rows (limited)
+        mock_pipeline.reverse.return_value = (
+            pd.DataFrame({"result": range(1, 6)}),
+            {"test_ref": pd.DataFrame({"id": [1, 2, 3]})},
+        )
+
+        self.engine.add_pipeline(mock_pipeline)
+
+        # Run engine in reverse mode with rows_limit
+        result = self.engine.run(
+            reverse=True,
+            reverse_output_path=self.reverse_output_path,
+            rows_limit=5,
+        )
+
+        # Verify results
+        assert isinstance(result, Results)
+        assert result.success is True
+
+        # Verify pipeline reverse was called with rows_limit
+        call_args = mock_pipeline.reverse.call_args
+        assert call_args[1]["rows_limit"] == 5
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    def test_reverse_missing_reverse_output_path_raises_error(self, mock_load_deid_ref):
+        """Test reverse raises error when reverse_output_path is missing."""
+        # Setup mocks
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline = Mock(spec=TablePipeline)
+        mock_pipeline.uid = "test_pipeline"
+        mock_pipeline.reverse.side_effect = ValueError(
+            "reverse_output_path is required when reverse=True"
+        )
+
+        self.engine.add_pipeline(mock_pipeline)
+
+        # Run engine in reverse mode without reverse_output_path
+        with pytest.raises(RuntimeError, match="Pipeline execution failed"):
+            self.engine.run(reverse=True, test_mode=False)
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_reverse_pipeline_exception_without_continue(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test reverse with pipeline exception and continue_on_error=False."""
+        # Setup mocks
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline = Mock(spec=TablePipeline)
+        mock_pipeline.uid = "test_pipeline"
+        mock_pipeline.reverse.side_effect = Exception("Reverse failed")
+
+        self.engine.add_pipeline(mock_pipeline)
+
+        # Run engine in reverse mode with continue_on_error=False (default)
+        with pytest.raises(
+            RuntimeError, match="Pipeline execution failed: Reverse failed"
+        ):
+            self.engine.run(
+                reverse=True,
+                reverse_output_path=self.reverse_output_path,
+                continue_on_error=False,
+            )
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_reverse_pipeline_exception_with_continue(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test reverse with pipeline exception and continue_on_error=True."""
+        # Setup mocks
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline1 = Mock(spec=TablePipeline)
+        mock_pipeline1.uid = "pipeline1"
+        mock_pipeline1.reverse.side_effect = Exception("Reverse 1 failed")
+
+        mock_pipeline2 = Mock(spec=TablePipeline)
+        mock_pipeline2.uid = "pipeline2"
+        mock_pipeline2.reverse.return_value = (pd.DataFrame({"result": [1, 2]}), {})
+
+        self.engine.add_pipeline(mock_pipeline1)
+        self.engine.add_pipeline(mock_pipeline2)
+
+        # Run engine in reverse mode with continue_on_error=True
+        result = self.engine.run(
+            reverse=True,
+            reverse_output_path=self.reverse_output_path,
+            continue_on_error=True,
+        )
+
+        # Verify results
+        assert isinstance(result, Results)
+        assert result.success is True  # Should still be True since we continued
+        assert len(result.results) == 2
+        assert result.results["pipeline1"].status == "error"
+        assert "Reverse 1 failed" in result.results["pipeline1"].error
+        assert result.results["pipeline2"].status == "success"
+        assert result.execution_order == ["pipeline1", "pipeline2"]
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_reverse_pipeline_without_reverse_method(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test reverse with pipeline that doesn't have reverse method."""
+        # Setup mocks
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline = Mock(spec=TablePipeline)
+        mock_pipeline.uid = "test_pipeline"
+        # Remove reverse method
+        del mock_pipeline.reverse
+
+        self.engine.add_pipeline(mock_pipeline)
+
+        # Run engine in reverse mode
+        result = self.engine.run(
+            reverse=True,
+            reverse_output_path=self.reverse_output_path,
+            continue_on_error=True,
+        )
+
+        # Verify results
+        assert isinstance(result, Results)
+        assert result.success is True
+        assert "test_pipeline" in result.results
+        assert result.results["test_pipeline"].status == "error"
+        # The error message is generated from the exception, which is "reverse" (AttributeError)
+        assert "reverse" in result.results["test_pipeline"].error
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_reverse_with_no_pipelines(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test reverse with no pipelines configured."""
+        # Setup mocks
+        mock_load_deid_ref.return_value = {}
+
+        # Run engine in reverse mode with no pipelines
+        with pytest.raises(
+            ValueError, match=r"No pipelines configured. Add pipelines before running."
+        ):
+            self.engine.run(reverse=True, reverse_output_path=self.reverse_output_path)
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_reverse_round_trip_consistency(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test that transform -> reverse maintains data integrity."""
+        # Setup mocks
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline = Mock(spec=TablePipeline)
+        mock_pipeline.uid = "test_pipeline"
+
+        # First call: transform
+        transformed_df = pd.DataFrame({"patient_id": [1, 2, 3]})
+        deid_ref_dict_after_transform = {"patient_uid": pd.DataFrame({"id": [1, 2, 3]})}
+
+        # Second call: reverse
+        reversed_df = pd.DataFrame({"patient_id": ["user_001", "user_002", "user_003"]})
+
+        # Set up side effects for transform and reverse
+        mock_pipeline.transform.return_value = (
+            transformed_df,
+            deid_ref_dict_after_transform,
+        )
+        mock_pipeline.reverse.return_value = (
+            reversed_df,
+            deid_ref_dict_after_transform,
+        )
+
+        self.engine.add_pipeline(mock_pipeline)
+
+        # Transform
+        transform_result = self.engine.run(reverse=False)
+
+        # Verify transform was called
+        assert transform_result.success is True
+        mock_pipeline.transform.assert_called_once()
+
+        # Reset mock for reverse
+        mock_pipeline.reset_mock()
+        mock_pipeline.transform.return_value = (
+            transformed_df,
+            deid_ref_dict_after_transform,
+        )
+        mock_pipeline.reverse.return_value = (
+            reversed_df,
+            deid_ref_dict_after_transform,
+        )
+
+        # Reverse
+        reverse_result = self.engine.run(
+            reverse=True, reverse_output_path=self.reverse_output_path
+        )
+
+        # Verify reverse was called
+        assert reverse_result.success is True
+        mock_pipeline.reverse.assert_called_once()
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_reverse_passes_deid_ref_dict_correctly(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test that deid_ref_dict is passed correctly to reverse."""
+        # Setup mocks
+        initial_deid_ref = {
+            "patient_uid": pd.DataFrame(
+                {
+                    "patient_uid": ["user_001", "user_002"],
+                    "patient_uid__deid": [1, 2],
+                }
+            )
+        }
+        mock_load_deid_ref.return_value = initial_deid_ref
+
+        mock_pipeline = Mock(spec=TablePipeline)
+        mock_pipeline.uid = "test_pipeline"
+        updated_deid_ref = initial_deid_ref.copy()
+        mock_pipeline.reverse.return_value = (
+            pd.DataFrame({"result": [1, 2]}),
+            updated_deid_ref,
+        )
+
+        self.engine.add_pipeline(mock_pipeline)
+
+        # Run engine in reverse mode
+        self.engine.run(reverse=True, reverse_output_path=self.reverse_output_path)
+
+        # Verify deid_ref_dict was passed correctly
+        call_args = mock_pipeline.reverse.call_args
+        assert "deid_ref_dict" in call_args[1]
+        assert "patient_uid" in call_args[1]["deid_ref_dict"]
+        pd.testing.assert_frame_equal(
+            call_args[1]["deid_ref_dict"]["patient_uid"],
+            initial_deid_ref["patient_uid"],
+        )
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_reverse_with_empty_deid_ref_dict(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test reverse with empty deid_ref_dict."""
+        # Setup mocks
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline = Mock(spec=TablePipeline)
+        mock_pipeline.uid = "test_pipeline"
+        mock_pipeline.reverse.return_value = (pd.DataFrame({"result": [1, 2]}), {})
+
+        self.engine.add_pipeline(mock_pipeline)
+
+        # Run engine in reverse mode
+        result = self.engine.run(
+            reverse=True, reverse_output_path=self.reverse_output_path
+        )
+
+        # Verify results
+        assert isinstance(result, Results)
+        assert result.success is True
+
+        # Verify empty deid_ref_dict was passed
+        call_args = mock_pipeline.reverse.call_args
+        assert call_args[1]["deid_ref_dict"] == {}
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_reverse_all_pipelines_fail_with_continue(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test reverse with all pipelines failing and continue_on_error=True."""
+        # Setup mocks
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline1 = Mock(spec=TablePipeline)
+        mock_pipeline1.uid = "pipeline1"
+        mock_pipeline1.reverse.side_effect = Exception("Reverse 1 failed")
+
+        mock_pipeline2 = Mock(spec=TablePipeline)
+        mock_pipeline2.uid = "pipeline2"
+        mock_pipeline2.reverse.side_effect = Exception("Reverse 2 failed")
+
+        self.engine.add_pipeline(mock_pipeline1)
+        self.engine.add_pipeline(mock_pipeline2)
+
+        # Run engine in reverse mode with continue_on_error=True
+        result = self.engine.run(
+            reverse=True,
+            reverse_output_path=self.reverse_output_path,
+            continue_on_error=True,
+        )
+
+        # Verify results
+        assert isinstance(result, Results)
+        assert result.success is True  # Should still be True since we continued
+        assert len(result.results) == 2
+        assert result.results["pipeline1"].status == "error"
+        assert result.results["pipeline2"].status == "error"
+        assert "Reverse 1 failed" in result.results["pipeline1"].error
+        assert "Reverse 2 failed" in result.results["pipeline2"].error
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_reverse_with_rows_limit_and_test_mode(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test reverse with both rows_limit and test_mode."""
+        # Setup mocks
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline = Mock(spec=TablePipeline)
+        mock_pipeline.uid = "test_pipeline"
+        mock_pipeline.reverse.return_value = (
+            pd.DataFrame({"result": range(1, 4)}),
+            {},
+        )
+
+        self.engine.add_pipeline(mock_pipeline)
+
+        # Run engine in reverse mode with both parameters
+        result = self.engine.run(
+            reverse=True,
+            reverse_output_path=self.reverse_output_path,
+            rows_limit=3,
+            test_mode=True,
+        )
+
+        # Verify results
+        assert isinstance(result, Results)
+        assert result.success is True
+
+        # Verify both parameters were passed
+        call_args = mock_pipeline.reverse.call_args
+        assert call_args[1]["rows_limit"] == 3
+        assert call_args[1]["test_mode"] is True
+
+        # Verify no saving occurred (test mode)
+        mock_save_results.assert_not_called()
+        mock_save_deid_ref.assert_not_called()

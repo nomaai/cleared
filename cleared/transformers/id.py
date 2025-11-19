@@ -82,37 +82,100 @@ class IDDeidentifier(FilterableTransformer):
             ValueError: If some values in df[ref_col] don't have deid mappings after processing
 
         """
+        return self._apply_deid(df, deid_ref_dict, reverse=False)
+
+    def _apply_reverse(
+        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """
+        Reverse the ID de-identification by mapping de-identified values back to original values.
+
+        This method:
+        1. Gets the deid_ref_df for this transformer's deid column's uid
+        2. Joins df with deid_ref_df to map de-identified values back to original values
+        3. Replaces the de-identified column with original values
+
+        Args:
+            df: DataFrame containing the de-identified data to reverse
+            deid_ref_dict: Dictionary of deidentification reference DataFrames, keyed by transformer UID
+
+        Returns:
+            Tuple of (reversed_df, updated_deid_ref_dict)
+
+        Raises:
+            ValueError: If deid column is not in df.columns
+            ValueError: If deid_ref_df is not found or doesn't have required columns
+            ValueError: If some values in df don't have mappings
+
+        """
+        return self._apply_deid(df, deid_ref_dict, reverse=True)
+
+    def _apply_deid(
+        self,
+        df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame],
+        reverse: bool = False,
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """Apply de-identification to the DataFrame."""
         # Validate input
         if self.idconfig.name not in df.columns:
             raise ValueError(f"Column '{self.idconfig.name}' not found in DataFrame")
 
         # Get or create deid_ref_df for this transformer's deid  column's uid
-        deid_ref_df = self._get_and_update_deid_mappings(df, deid_ref_dict)
+
+        deid_ref_df = (
+            self._get_and_update_deid_mappings(df, deid_ref_dict)
+            if not reverse
+            else deid_ref_dict.get(self.idconfig.uid)
+        )
+        if deid_ref_df is None:
+            raise ValueError(
+                f"De-identification reference not found for transformer {self.uid} and identifier {self.idconfig.name}"
+            )
+
+        if self.idconfig.deid_uid() not in deid_ref_df.columns:
+            raise ValueError(
+                f"Deid column '{self.idconfig.deid_uid()}' not found in deid_ref_df for transformer {self.uid} and identifier {self.idconfig.name}"
+            )
+
+        if self.idconfig.uid not in deid_ref_df.columns:
+            raise ValueError(
+                f"UID column '{self.idconfig.uid}' not found in deid_ref_df for transformer {self.uid} and identifier {self.idconfig.name}"
+            )
 
         # Inner join to ensure all values have mappings (raises error if some don't)
         merged = df.merge(
             deid_ref_df[[self.idconfig.uid, self.idconfig.deid_uid()]],
             left_on=self.idconfig.name,
-            right_on=self.idconfig.uid,
+            right_on=self.idconfig.uid if not reverse else self.idconfig.deid_uid(),
             how="inner",
         )
+
         if merged.shape[0] != df.shape[0]:
             raise ValueError(
                 f"Some values in '{self.idconfig.name}' don't have deid mappings"
             )
 
-        # Replace original column with deidentified values
-        merged[self.idconfig.name] = merged[self.idconfig.deid_uid()]
+        # Replace the column values with deidentified/original values
+        merged[self.idconfig.name] = (
+            merged[self.idconfig.deid_uid()]
+            if not reverse
+            else merged[self.idconfig.uid]
+        )
+
         # Drop the reference columns that were added during merge
         columns_to_drop = [self.idconfig.deid_uid()]
         if self.idconfig.uid != self.idconfig.name:
             columns_to_drop.append(self.idconfig.uid)
-        if columns_to_drop:
+
+        if columns_to_drop is not None and len(columns_to_drop) > 0:
             merged.drop(columns=columns_to_drop, inplace=True)
 
-        # Update the deid_ref_dict with the new/updated deid_ref_df
+        # Update the deid_ref_dict with the new/updated deid_ref_df/ unchanged
         updated_deid_ref_dict = deid_ref_dict.copy()
-        updated_deid_ref_dict[self.idconfig.uid] = deid_ref_df.copy()
+        if not reverse:
+            updated_deid_ref_dict[self.idconfig.uid] = deid_ref_df.copy()
+
         return merged, updated_deid_ref_dict
 
     def _get_and_update_deid_mappings(
