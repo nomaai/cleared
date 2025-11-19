@@ -12,6 +12,7 @@ import pandas as pd
 from .base import Pipeline, BaseTransformer
 from ..io import BaseDataLoader
 from ..config.structure import IOConfig, DeIDConfig, PairedIOConfig
+from pathlib import Path
 
 
 class TablePipeline(Pipeline):
@@ -93,12 +94,65 @@ class TablePipeline(Pipeline):
             ValueError: If table cannot be read and no DataFrame is provided
 
         """
+        return self._run_pipeline(
+            df,
+            deid_ref_dict,
+            rows_limit,
+            test_mode,
+            reverse=False,
+            reverse_output_path=None,
+        )
+
+    def reverse(
+        self,
+        df: pd.DataFrame | None = None,
+        deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+        rows_limit: int | None = None,
+        test_mode: bool = False,
+        reverse_output_path: str | Path | None = None,
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """
+        Reverse the table data.
+
+        Args:
+            df: Optional input DataFrame. If None, table will be read from data source
+            deid_ref_dict: Optional dictionary of de-identification reference DataFrames
+            rows_limit: Optional limit on number of rows to read (for testing)
+            test_mode: If True, skip writing outputs (dry run mode)
+            reverse_output_path: Directory path for reverse mode output (required)
+
+        Returns:
+            Tuple of (reversed_df, updated_deid_ref_dict)
+
+        """
+        return self._run_pipeline(
+            df,
+            deid_ref_dict,
+            rows_limit,
+            test_mode,
+            reverse=True,
+            reverse_output_path=reverse_output_path,
+        )
+
+    def _run_pipeline(
+        self,
+        df: pd.DataFrame | None = None,
+        deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+        rows_limit: int | None = None,
+        test_mode: bool = False,
+        reverse: bool = False,
+        reverse_output_path: str | Path | None = None,
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """Run the pipeline."""
+        # Prepare IO configuration for reverse mode
+        read_config, reverse_output_config = self._prepare_reverse_io_config(
+            self.io_config, reverse, reverse_output_path
+        )
+
         # Read table if no DataFrame provided
         if df is None:
             try:
-                with self._create_data_loader(
-                    self.io_config.input_config
-                ) as data_loader:
+                with self._create_data_loader(read_config) as data_loader:
                     df = data_loader.read_table(self.table_name, rows_limit=rows_limit)
             except Exception as e:
                 raise ValueError(
@@ -109,12 +163,79 @@ class TablePipeline(Pipeline):
         if deid_ref_dict is None:
             deid_ref_dict = {}
 
-        # Process with base pipeline
-        df, deid_ref_dict = super().transform(df, deid_ref_dict)
+        # Process with base pipeline (use reverse() if in reverse mode)
+        if reverse:
+            df, deid_ref_dict = super().reverse(df, deid_ref_dict)
+        else:
+            df, deid_ref_dict = super().transform(df, deid_ref_dict)
 
-        # Write de-identified data to the data source (skip in test mode)
+        # Write data to the appropriate location (skip in test mode)
         if not test_mode:
-            with self._create_data_loader(self.io_config.output_config) as data_loader:
-                data_loader.write_deid_table(df, self.table_name)
+            if reverse:
+                # Write to reverse output path
+                if reverse_output_config is None:
+                    raise ValueError(
+                        "reverse_output_config is required when reverse=True"
+                    )
+                with self._create_data_loader(reverse_output_config) as data_loader:
+                    data_loader.write_deid_table(df, self.table_name)
+            else:
+                # Write to normal output config
+                with self._create_data_loader(
+                    self.io_config.output_config
+                ) as data_loader:
+                    data_loader.write_deid_table(df, self.table_name)
 
         return df, deid_ref_dict
+
+    def _prepare_reverse_io_config(
+        self,
+        io_config: PairedIOConfig,
+        reverse: bool,
+        reverse_output_path: str | Path | None,
+    ) -> tuple[IOConfig, IOConfig | None]:
+        """
+        Prepare IO configuration for reverse mode.
+
+        Args:
+            io_config: Paired IO configuration for data loading
+            reverse: If True, run in reverse mode (read from output config, write to reverse path)
+            reverse_output_path: Directory path for reverse mode output (required if reverse=True)
+
+        Returns:
+            Tuple of (read_config, reverse_output_config)
+            - read_config: IOConfig to use for reading data
+            - reverse_output_config: IOConfig to use for writing reversed data (None if not reverse mode)
+
+        Raises:
+            ValueError: If reverse_output_path is required but not provided
+
+        """
+        if reverse:
+            # Read from output config (where de-identified data is)
+            read_config = io_config.output_config
+            # Create reverse output config pointing to reverse_output_path
+            if reverse_output_path is None:
+                raise ValueError("reverse_output_path is required when reverse=True")
+
+            reverse_output_path = Path(reverse_output_path)
+            reverse_output_path.mkdir(parents=True, exist_ok=True)
+
+            # Create a new IOConfig for reverse output with the same settings as output but different path
+            reverse_output_config = IOConfig(
+                io_type=read_config.io_type,
+                suffix=read_config.suffix,
+                configs=read_config.configs.copy(),
+            )
+
+            # Update base_path to point to reverse_output_path
+            if "base_path" in reverse_output_config.configs:
+                reverse_output_config.configs["base_path"] = str(reverse_output_path)
+            else:
+                reverse_output_config.configs["base_path"] = str(reverse_output_path)
+        else:
+            # Normal mode: read from input config
+            read_config = io_config.input_config
+            reverse_output_config = None
+
+        return read_config, reverse_output_config

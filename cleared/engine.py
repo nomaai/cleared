@@ -8,6 +8,7 @@ and manages the overall de-identification process.
 from __future__ import annotations
 
 from typing import Any, Literal
+from pathlib import Path
 import pandas as pd
 from dataclasses import dataclass, field
 import os
@@ -298,6 +299,8 @@ class ClearedEngine:
         continue_on_error: bool = False,
         rows_limit: int | None = None,
         test_mode: bool = False,
+        reverse: bool = False,
+        reverse_output_path: str | Path | None = None,
     ) -> dict[str, Any]:
         """
         Run all pipelines sequentially.
@@ -311,6 +314,8 @@ class ClearedEngine:
                              If False, stop on first error.
             rows_limit: Optional limit on number of rows to read per table (for testing)
             test_mode: If True, skip writing outputs (dry run mode)
+            reverse: If True, run in reverse mode (read from output config, write to reverse path)
+            reverse_output_path: Directory path for reverse mode output (required if reverse=True)
 
         Returns:
             Dictionary containing:
@@ -341,6 +346,8 @@ class ClearedEngine:
                 continue_on_error,
                 rows_limit=rows_limit,
                 test_mode=test_mode,
+                reverse=reverse,
+                reverse_output_path=reverse_output_path,
             )
 
         # Store results in instance
@@ -362,17 +369,21 @@ class ClearedEngine:
         continue_on_error: bool,
         rows_limit: int | None = None,
         test_mode: bool = False,
+        reverse: bool = False,
+        reverse_output_path: str | Path | None = None,
     ) -> dict[str, pd.DataFrame]:
         """
         Run a table pipeline and update the de-identification reference dictionary.
 
         Args:
-            table_pipeline: TablePipeline to run
-            results: Results to store
-            current_deid_ref_dict: Current de-identification reference dictionary
-            continue_on_error: Whether to continue execution if this pipeline fails
-            rows_limit: Optional limit on number of rows to read per table (for testing)
-            test_mode: If True, skip writing outputs (dry run mode)
+               table_pipeline: TablePipeline to run
+               results: Results to store
+               current_deid_ref_dict: Current de-identification reference dictionary
+               continue_on_error: Whether to continue execution if this pipeline fails
+               rows_limit: Optional limit on number of rows to read per table (for testing)
+               test_mode: If True, skip writing outputs (dry run mode)
+               reverse: If True, run in reverse mode (read from output config, write to reverse path)
+               reverse_output_path: Directory path for reverse mode output (required if reverse=True)
 
         Returns:
             Updated de-identification reference dictionary
@@ -390,11 +401,14 @@ class ClearedEngine:
                 table_pipeline.transform
             ):
                 # Pipeline has transform method - execute it
-                _, updated_deid_ref_dict = table_pipeline.transform(
+                _, updated_deid_ref_dict = self._call_pipeline(
+                    pipeline=table_pipeline,
                     df=None,
                     deid_ref_dict=current_deid_ref_dict,
                     rows_limit=rows_limit,
                     test_mode=test_mode,
+                    reverse=reverse,
+                    reverse_output_path=reverse_output_path,
                 )
 
                 # Store pipeline result
@@ -420,6 +434,48 @@ class ClearedEngine:
 
             # If continuing on error, return the unchanged deid_ref_dict
             return current_deid_ref_dict
+
+    def _call_pipeline(
+        self,
+        pipeline: TablePipeline,
+        df: pd.DataFrame | None = None,
+        deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+        rows_limit: int | None = None,
+        test_mode: bool = False,
+        reverse: bool = False,
+        reverse_output_path: str | Path | None = None,
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """
+        Call the appropriate pipeline method (transform or reverse).
+
+        Args:
+            pipeline: TablePipeline to execute
+            df: Optional input DataFrame
+            deid_ref_dict: Dictionary of de-identification reference DataFrames
+            rows_limit: Optional limit on number of rows to read
+            test_mode: If True, skip writing outputs
+            reverse: If True, call reverse() instead of transform()
+            reverse_output_path: Directory path for reverse mode output
+
+        Returns:
+            Tuple of (result_df, updated_deid_ref_dict)
+
+        """
+        if not reverse:
+            return pipeline.transform(
+                df=df,
+                deid_ref_dict=deid_ref_dict,
+                rows_limit=rows_limit,
+                test_mode=test_mode,
+            )
+        else:
+            return pipeline.reverse(
+                df=df,
+                deid_ref_dict=deid_ref_dict,
+                rows_limit=rows_limit,
+                test_mode=test_mode,
+                reverse_output_path=reverse_output_path,
+            )
 
     def _load_initial_deid_ref_dict(self) -> dict[str, pd.DataFrame]:
         """

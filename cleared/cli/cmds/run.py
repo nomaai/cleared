@@ -94,9 +94,11 @@ def _run_engine_internal(
     verbose: bool,
     rows_limit: int | None,
     test_mode: bool,
+    reverse: bool = False,
+    reverse_output_path: Path | None = None,
 ) -> None:
     """
-    Run the engine with optional test mode.
+    Run the engine with optional test mode and reverse mode.
 
     Args:
         config_path: Path to the configuration file
@@ -107,6 +109,8 @@ def _run_engine_internal(
         verbose: Verbose output flag
         rows_limit: Optional limit on number of rows to read per table (for testing)
         test_mode: If True, skip writing outputs (dry run mode)
+        reverse: If True, run in reverse mode (read from output, write to reverse path)
+        reverse_output_path: Directory path for reverse mode output (required if reverse=True)
 
     """
     try:
@@ -127,18 +131,13 @@ def _run_engine_internal(
         engine._init_from_config(cleared_config)
 
         _print_engine_initialized(engine._pipelines, verbose)
-
-        if test_mode:
-            typer.echo(
-                f"Starting test run (processing first {rows_limit} rows per table, no outputs)..."
-            )
-        else:
-            typer.echo("Starting de-identification process...")
-
+        print_run_mode(reverse, test_mode, rows_limit)
         results = engine.run(
             continue_on_error=continue_on_error,
             rows_limit=rows_limit,
             test_mode=test_mode,
+            reverse=reverse,
+            reverse_output_path=reverse_output_path,
         )
 
         _display_results(results, verbose)
@@ -153,6 +152,26 @@ def _run_engine_internal(
 # ============================================================================
 # Utility functions for printing/display
 # ============================================================================
+
+
+def print_run_mode(reverse: bool, test_mode: bool, rows_limit: int | None) -> None:
+    """
+    Print the run mode message.
+
+    Args:
+        reverse: If True, run in reverse mode (read from output, write to reverse path)
+        test_mode: If True, run in test mode (process first rows_limit rows per table, no outputs)
+        rows_limit: Number of rows to process per table (for testing)
+
+    """
+    if reverse:
+        typer.echo("Starting reverse de-identification process...")
+    elif test_mode:
+        typer.echo(
+            f"Starting test run (processing first {rows_limit} rows per table, no outputs)..."
+        )
+    else:
+        typer.echo("Starting de-identification process...")
 
 
 def _print_config_loaded(

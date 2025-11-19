@@ -20,6 +20,16 @@ class MockFilterableTransformer(FilterableTransformer):
         df["age"] = df["age"] * 2
         return df, deid_ref_dict
 
+    def _apply_reverse(
+        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """Apply reverse transformation: divide age by 2."""
+        df = df.copy()
+        # Reverse transformation: divide age by 2
+        if "age" in df.columns:
+            df["age"] = df["age"] / 2
+        return df, deid_ref_dict
+
 
 class TestFilterableTransformerBasic:
     """Test basic functionality of FilterableTransformer."""

@@ -70,3 +70,25 @@ class ColumnDropper(BaseTransformer):
 
         # Return the transformed DataFrame and unchanged deid_ref_dict
         return result_df, deid_ref_dict.copy() if deid_ref_dict is not None else None
+
+    def reverse(
+        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """
+        Reverse the column drop operation.
+
+        Note: Since a dropped column cannot be restored without the original data,
+        this method simply returns the DataFrame as-is. In reverse mode, the column
+        is already missing from the input DataFrame (read from output), so there's
+        nothing to restore.
+
+        Args:
+            df: Input DataFrame (column is already missing in reverse mode)
+            deid_ref_dict: Dictionary of reference DataFrames (not used for this transformer)
+
+        Returns:
+            Tuple of (unchanged DataFrame, unchanged deid_ref_dict)
+
+        """
+        # In reverse mode, the column is already dropped, so just return as-is
+        return df.copy(), deid_ref_dict.copy() if deid_ref_dict is not None else {}

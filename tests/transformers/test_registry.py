@@ -30,6 +30,9 @@ class TestTransformerRegistry:
             ):
                 return df.copy(), deid_ref_dict.copy()
 
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
+                return df.copy(), deid_ref_dict.copy()
+
         self.MockTransformer = MockTransformer
 
     def test_init_with_defaults(self):
@@ -181,6 +184,9 @@ class TestTransformerRegistry:
             def transform(
                 self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
             ):
+                return df.copy(), deid_ref_dict.copy()
+
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
                 return df.copy(), deid_ref_dict.copy()
 
         registry = TransformerRegistry(use_defaults=False)
@@ -349,6 +355,9 @@ class TestTransformerRegistry:
             ):
                 return df.copy(), deid_ref_dict.copy()
 
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
+                return df.copy(), deid_ref_dict.copy()
+
         registry.register("ConfigAwareTransformer", ConfigAwareTransformer)
 
         # Use a real DictConfig for testing
@@ -405,6 +414,9 @@ class TestTransformerRegistry:
 
                 return df_copy, deid_ref_dict.copy()
 
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
+                return df.copy(), deid_ref_dict.copy()
+
         custom_transformers = {
             "ComplexTransformer1": ComplexTransformer,
             "ComplexTransformer2": ComplexTransformer,
@@ -453,10 +465,16 @@ class TestTransformerRegistry:
             ):
                 return df.copy(), deid_ref_dict.copy()
 
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
+                return df.copy(), deid_ref_dict.copy()
+
         class TransformerB(BaseTransformer):
             def transform(
                 self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
             ):
+                return df.copy(), deid_ref_dict.copy()
+
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
                 return df.copy(), deid_ref_dict.copy()
 
         registry.register("TransformerA", TransformerA)

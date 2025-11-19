@@ -45,6 +45,7 @@
 | ✅ **Concept ID Filtering** | Create deidentification rules in values based on concept_id filters |
 | ✅ **Conditional De-identification** |  Ability to only apply de-identification rules|
 | ✅ **Pseudonymization Engine** | Deterministic, reversible pseudonyms for longitudinal tracking |
+| ✅ **Reverse De-identification** | Restore original values from de-identified data using reference mappings |
 | ✅ **Custom Transformers PLugins** | Supports implementation of plugins for custom de-identification filters and methods  |
 | ✅ **Healthcare-Ready Defaults** | Includes mappings for demographics, identifiers, and care events |
 | ✅ **Configuration Reusability** | Leverages the well-known hydra configuration yaml file to facilitate reusability of existing configs, partial configuration imoporting, configuration inheritencfe and customizations |
@@ -68,15 +69,16 @@
 2. [Using Configuration Files](docs/use_cleared_config.md) - De-identification with YAML configs and CLI
 3. [Multi-table De-identification](docs/multi_table_pipeline_config.md) - Handle related tables with consistent de-identification
 4. [Rerun De-identification with Consistency](docs/rerun_deidentification_consistency.md) - Maintain consistency when adding new data
-5. [UIDs de-identification](docs/group-level-id-deidentification.md)
-6. [CLI Usage Guide](docs/cli-usage.md)
-7. [Linting Rules Reference](docs/linting_rules.md) - Complete reference for all configuration linting rules
-8. [Date and Time Shifting](docs/date-and-time-shifting.md)
-9. [Free-text PHI Detection](docs/phi-detection.md)
-10. [Logging and Auditing](docs/logging-and-auditing.md)
-11. [Healthcare Schema Support](docs/healthcare-schema-support.md)
-12. [Custom Transformers Plugins](docs/custom-transformers-plugins.md)
-13. [Contributing](docs/contributing.md)
+5. [Reversing De-identification](docs/reverse.md) - Restore original values from de-identified data
+6. [UIDs de-identification](docs/group-level-id-deidentification.md)
+7. [CLI Usage Guide](docs/cli-usage.md)
+8. [Linting Rules Reference](docs/linting_rules.md) - Complete reference for all configuration linting rules
+9. [Date and Time Shifting](docs/date-and-time-shifting.md)
+10. [Free-text PHI Detection](docs/phi-detection.md)
+11. [Logging and Auditing](docs/logging-and-auditing.md)
+12. [Healthcare Schema Support](docs/healthcare-schema-support.md)
+13. [Custom Transformers Plugins](docs/custom-transformers-plugins.md)
+14. [Contributing](docs/contributing.md)
 
 ## 🛣 Roadmap
 

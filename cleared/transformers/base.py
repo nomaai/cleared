@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 import pandas as pd
 from uuid import uuid4
 import networkx as nx
@@ -82,6 +83,25 @@ class BaseTransformer(BaseTask):
         """
         pass
 
+    @abstractmethod
+    def reverse(
+        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """
+        Reverse the transformation to restore original values.
+
+        By default, this calls transform() which should be overridden by subclasses
+        that need custom reverse behavior.
+
+        Args:
+            df: Input DataFrame to reverse
+            deid_ref_dict: Dictionary of De-identification reference DataFrames
+        Returns:
+            Tuple of (reversed_df, updated_deid_ref_dict)
+
+        """
+        pass
+
 
 class FilterableTransformer(BaseTransformer):
     """Filterable transformer class that applies filters before transformation."""
@@ -124,6 +144,68 @@ class FilterableTransformer(BaseTransformer):
             Tuple of (transformed_df, updated_deid_ref_dict)
 
         """
+        return self.filter_and_apply(df, deid_ref_dict, self._apply_transform)
+
+    @abstractmethod
+    def _apply_transform(
+        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """
+        Apply the actual transformation to the filtered DataFrame.
+
+        Args:
+            df: Filtered DataFrame to transform
+            deid_ref_dict: Dictionary of De-identification reference DataFrames
+        Returns:
+            Tuple of (transformed_df, updated_deid_ref_dict)
+
+        """
+        pass
+
+    def reverse(
+        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """
+        Reverse the transformation to restore original values.
+
+        Args:
+            df: Input DataFrame to reverse
+            deid_ref_dict: Dictionary of De-identification reference DataFrames
+        Returns:
+            Tuple of (reversed_df, updated_deid_ref_dict)
+
+        """
+        return self.filter_and_apply(df, deid_ref_dict, self._apply_reverse)
+
+    @abstractmethod
+    def _apply_reverse(
+        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """
+        Apply the actual reverse transformation to the filtered DataFrame.
+
+        By default, this calls _apply_transform. Subclasses should override
+        this method if they need custom reverse behavior.
+
+        Args:
+            df: Filtered DataFrame to reverse
+            deid_ref_dict: Dictionary of De-identification reference DataFrames
+        Returns:
+            Tuple of (reversed_df, updated_deid_ref_dict)
+
+        """
+        pass
+
+    def filter_and_apply(
+        self,
+        df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame],
+        apply_fnc: Callable[
+            [pd.DataFrame, dict[str, pd.DataFrame]],
+            tuple[pd.DataFrame, dict[str, pd.DataFrame]],
+        ],
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """Filter the input DataFrame and apply a function to the filtered DataFrame."""
         # Store original index for later reconstruction
         self._original_index = df.index.copy()
 
@@ -136,9 +218,7 @@ class FilterableTransformer(BaseTransformer):
             filtered_df = self._apply_value_cast(filtered_df)
 
         # Apply the actual transformation to the filtered subset
-        transformed_df, updated_deid_ref_dict = self._apply_transform(
-            filtered_df, deid_ref_dict
-        )
+        transformed_df, updated_deid_ref_dict = apply_fnc(filtered_df, deid_ref_dict)
 
         # Ensure transformed_df has the same index as filtered_df
         transformed_df = transformed_df.set_index(filtered_df.index)
@@ -258,22 +338,6 @@ class FilterableTransformer(BaseTransformer):
 
         return df
 
-    @abstractmethod
-    def _apply_transform(
-        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
-    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
-        """
-        Apply the actual transformation to the filtered DataFrame.
-
-        Args:
-            df: Filtered DataFrame to transform
-            deid_ref_dict: Dictionary of De-identification reference DataFrames
-        Returns:
-            Tuple of (transformed_df, updated_deid_ref_dict)
-
-        """
-        pass
-
 
 # ============================================================
 # PIPELINE CLASS (ALSO A TRANSFORMER)
@@ -328,33 +392,86 @@ class Pipeline(BaseTransformer):
             Tuple of (transformed_df, updated_deid_ref_dict)
 
         """
+        self._validate_input(df, deid_ref_dict)
+        if len(self.__transformers) == 0:
+            return df, deid_ref_dict
+
+        if self.sequential_execution:
+            return self._run_sequentially(df, deid_ref_dict, reverse=False)
+        else:
+            return self._transform_in_parallel(df, deid_ref_dict)
+
+    def reverse(
+        self,
+        df: pd.DataFrame | None = None,
+        deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """
+        Reverse the transformations using the transformers in the pipeline.
+
+        Args:
+            df: Input DataFrame to reverse
+            deid_ref_dict: Dictionary of De-identification reference DataFrames, keys are the UID of the transformers that created the reference
+        Returns:
+            Tuple of (reversed_df, updated_deid_ref_dict)
+
+        """
+        self._validate_input(df, deid_ref_dict)
+        if len(self.__transformers) == 0:
+            return df, deid_ref_dict
+
+        if self.sequential_execution:
+            return self._run_sequentially(df, deid_ref_dict, reverse=True)
+        else:
+            return self._reverse_in_parallel(df, deid_ref_dict)
+
+    def _run_sequentially(
+        self,
+        df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame],
+        reverse: bool = False,
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """Run the transformers in the pipeline in sequence."""
+        result_df = df
+        transformers = (
+            self.__transformers if not reverse else reversed(self.__transformers)
+        )
+        for transformer in transformers:
+            if not reverse:
+                result_df, deid_ref_dict = transformer.transform(
+                    result_df, deid_ref_dict
+                )
+            else:
+                result_df, deid_ref_dict = transformer.reverse(result_df, deid_ref_dict)
+        return result_df, deid_ref_dict
+
+    def _validate_input(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
+        """Validate the input data and de-identification reference dictionary."""
         if df is None:
             raise ValueError("DataFrame is required")
 
         if deid_ref_dict is None:
             raise ValueError("De-identification reference dictionary is required")
 
-        if len(self.__transformers) == 0:
-            return df, deid_ref_dict
-
-        if self.sequential_execution:
-            return self._transform_sequentially(df, deid_ref_dict)
-        else:
-            return self._transform_in_parallel(df, deid_ref_dict)
-
-    def _transform_sequentially(
+    def _reverse_in_parallel(
         self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
     ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
-        """Transform the data using the transformers in the pipeline in sequence."""
-        result_df = df
-        for transformer in self.__transformers:
-            result_df, deid_ref_dict = transformer.transform(result_df, deid_ref_dict)
-        return result_df, deid_ref_dict
+        """Reverse the data using the transformers in the pipeline in parallel (reverse topological order)."""
+        return self._run_in_parallel(df, deid_ref_dict, reverse=True)
 
     def _transform_in_parallel(
         self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
     ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
         """Transform the data using the transformers in the pipeline in parallel."""
+        return self._run_in_parallel(df, deid_ref_dict, reverse=False)
+
+    def _run_in_parallel(
+        self,
+        df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame],
+        reverse: bool = False,
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """Run the transformers in the pipeline in parallel."""
         # Build and execute DAG
         graph = nx.DiGraph()
         transformer_map = {tf.uid: tf for tf in self.__transformers}
@@ -364,8 +481,17 @@ class Pipeline(BaseTransformer):
                 graph.add_edge(dep_uid, tf.uid)
 
         deid_ref_dict = deid_ref_dict.copy() if deid_ref_dict is not None else None
-        for tf_uid in nx.topological_sort(graph):
-            df, deid_ref_dict = transformer_map[tf_uid].transform(df, deid_ref_dict)
+        ordered_transformers = [
+            transformer_map[tf_uid] for tf_uid in nx.topological_sort(graph)
+        ]
+        if reverse:
+            ordered_transformers = reversed(ordered_transformers)
+
+        for transformer in ordered_transformers:
+            if not reverse:
+                df, deid_ref_dict = transformer.transform(df, deid_ref_dict)
+            else:
+                df, deid_ref_dict = transformer.reverse(df, deid_ref_dict)
 
         return df, deid_ref_dict
 

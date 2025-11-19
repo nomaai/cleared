@@ -27,6 +27,9 @@ class TestTransformerRegistryEdgeCases:
             ):
                 return df.copy(), deid_ref_dict.copy()
 
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
+                return df.copy(), deid_ref_dict.copy()
+
         self.MockTransformer = MockTransformer
 
     def test_empty_registry_operations(self):
@@ -131,6 +134,9 @@ class TestTransformerRegistryEdgeCases:
             ):
                 return df.copy(), deid_ref_dict.copy()
 
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
+                return df.copy(), deid_ref_dict.copy()
+
         registry.register("NoneAwareTransformer", NoneAwareTransformer)
 
         transformer = registry.instantiate("NoneAwareTransformer", None)
@@ -151,6 +157,9 @@ class TestTransformerRegistryEdgeCases:
             ):
                 return df.copy(), deid_ref_dict.copy()
 
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
+                return df.copy(), deid_ref_dict.copy()
+
         registry.register("EmptyConfigTransformer", EmptyConfigTransformer)
 
         transformer = registry.instantiate("EmptyConfigTransformer", {})
@@ -169,6 +178,9 @@ class TestTransformerRegistryEdgeCases:
             def transform(
                 self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
             ):
+                return df.copy(), deid_ref_dict.copy()
+
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
                 return df.copy(), deid_ref_dict.copy()
 
         registry.register("EmptyDictConfigTransformer", EmptyDictConfigTransformer)
@@ -255,6 +267,9 @@ class TestTransformerRegistryEdgeCases:
             ):
                 return df.copy(), deid_ref_dict.copy()
 
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
+                return df.copy(), deid_ref_dict.copy()
+
         registry.register("ComplexConfigTransformer", ComplexConfigTransformer)
 
         complex_config = DictConfig(
@@ -286,6 +301,9 @@ class TestTransformerRegistryEdgeCases:
             def transform(
                 self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
             ):
+                return df.copy(), deid_ref_dict.copy()
+
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
                 return df.copy(), deid_ref_dict.copy()
 
         registry.register("FailingTransformer", FailingTransformer)
@@ -414,6 +432,9 @@ class TestTransformerRegistryEdgeCases:
             def transform(
                 self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
             ):
+                return df.copy(), deid_ref_dict.copy()
+
+            def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
                 return df.copy(), deid_ref_dict.copy()
 
         registry.register("SelfModifyingTransformer", SelfModifyingTransformer)

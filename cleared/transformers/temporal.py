@@ -26,35 +26,12 @@ class DateTimeDeidentifier(FilterableTransformer):
     This transformer applies time shifts to datetime columns based on reference column values
     (e.g., patient_id). The same reference value will always receive the same time shift,
     ensuring consistency across multiple datetime columns for the same entity.
-
-    Null Handling:
-        - Reference column (idconfig.name): Null values are NOT allowed. The transformer
-          will raise a ValueError if any null values are detected in the reference column.
-          This is required because time shifts are keyed by reference values.
-        - Datetime column (datetime_column): Null values ARE preserved. If the datetime
-          column contains null/NaT values, they will remain as null in the output after
-          transformation. The time shift operation does not modify null datetime values.
-
-    Examples:
-        >>> from cleared.config.structure import IdentifierConfig, DeIDConfig, TimeShiftConfig
-        >>> idconfig = IdentifierConfig(name="patient_id", uid="patient_uid")
-        >>> deid_config = DeIDConfig(time_shift=TimeShiftConfig(method="shift_by_days", min=-30, max=30))
-        >>> transformer = DateTimeDeidentifier(
-        ...     idconfig=idconfig,
-        ...     global_deid_config=deid_config,
-        ...     datetime_column="admission_date"
-        ... )
-        >>> # Transform data - nulls in datetime column are preserved
-        >>> result_df, deid_ref = transformer.transform(df, {})
-
     """
 
     def __init__(
         self,
-        idconfig: IdentifierConfig,
+        idconfig: IdentifierConfig | dict,
         datetime_column: str,
-        deid_config: DeIDConfig | None = None,
-        time_shift_method: str | None = None,
         filter_config: FilterConfig | None = None,
         value_cast: str | None = None,
         uid: str | None = None,
@@ -62,13 +39,11 @@ class DateTimeDeidentifier(FilterableTransformer):
         global_deid_config: DeIDConfig | None = None,
     ):
         """
-        Initialize DateTimeDeidentifier.
+        Initialize the DateTimeDeidentifier.
 
         Args:
             idconfig: Configuration for the reference column used for time shifting
             datetime_column: Name of the datetime column to shift
-            deid_config: De-identification configuration (deprecated, use global_deid_config)
-            time_shift_method: Name of the time shift method to apply (deprecated)
             filter_config: Configuration for filtering operations
             value_cast: Type to cast the de-identification column to
             uid: Unique identifier for the transformer
@@ -88,7 +63,16 @@ class DateTimeDeidentifier(FilterableTransformer):
             dependencies=dependencies,
             global_deid_config=global_deid_config,
         )
-        self.idconfig = idconfig
+
+        # Handle both IdentifierConfig object and dict
+        if isinstance(idconfig, dict):
+            if "idconfig" in idconfig:
+                self.idconfig = IdentifierConfig(**idconfig["idconfig"])
+            else:
+                self.idconfig = IdentifierConfig(**idconfig)
+        else:
+            self.idconfig = idconfig
+
         self.datetime_column = datetime_column
 
         if self.idconfig is None:
@@ -119,10 +103,6 @@ class DateTimeDeidentifier(FilterableTransformer):
         self.time_shift_generator = create_time_shift_generator(
             self.global_deid_config.time_shift
         )
-
-    def _get_column_to_cast(self) -> str | None:
-        """Get the column name to cast (the datetime column being de-identified)."""
-        return self.datetime_column
 
     def _apply_transform(
         self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
@@ -156,25 +136,106 @@ class DateTimeDeidentifier(FilterableTransformer):
               column contains null values (NaT), they will remain as null in the output.
               The time shift operation preserves nulls when applying date offsets.
 
-        Examples:
-            >>> # Valid: No nulls in reference column, nulls in datetime are preserved
-            >>> df = pd.DataFrame({
-            ...     "patient_id": [1, 2, 3],
-            ...     "admission_date": [datetime(2023, 1, 1), None, datetime(2023, 1, 3)]
-            ... })
-            >>> result_df, _ = transformer.transform(df, {})
-            >>> # Result: admission_date will have [shifted_date, NaT, shifted_date]
+        """
+        return self._apply_datetime_deid(df, deid_ref_dict, reverse=False)
 
-            >>> # Invalid: Nulls in reference column will raise ValueError
-            >>> df = pd.DataFrame({
-            ...     "patient_id": [1, None, 3],
-            ...     "admission_date": [datetime(2023, 1, 1), datetime(2023, 1, 2), datetime(2023, 1, 3)]
-            ... })
-            >>> transformer.transform(df, {})  # Raises ValueError
+    def _apply_reverse(
+        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """
+        Reverse the time shift transformation to restore original datetime values.
+
+        This method:
+        1. Gets the timeshift_df from deid_ref_dict
+        2. Joins df with timeshift_df to get shift amounts
+        3. Applies negative shift to restore original datetime values
+
+        Args:
+            df: DataFrame containing the shifted datetime data to reverse
+            deid_ref_dict: Dictionary of deidentification reference DataFrames, keyed by transformer UID
+
+        Returns:
+            Tuple of (reversed_df, updated_deid_ref_dict)
+
+        Raises:
+            ValueError: If required columns are not found
+            ValueError: If timeshift_df is not found in deid_ref_dict
+            ValueError: If some values don't have shift mappings
+
+        """
+        return self._apply_datetime_deid(df, deid_ref_dict, reverse=True)
+
+    def _apply_datetime_deid(
+        self,
+        df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame],
+        reverse: bool = False,
+    ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
+        """
+        Apply or reverse datetime de-identification using time shifting.
+
+        This is a helper function that handles both forward transformation and reverse
+        transformation. The `reverse` parameter determines the direction of the operation.
+
+        Args:
+            df: DataFrame containing the data to transform or reverse
+            deid_ref_dict: Dictionary of deidentification reference DataFrames, keyed by transformer UID
+            reverse: If True, reverse the transformation (restore original values).
+                    If False, apply transformation (shift datetime values).
+
+        Returns:
+            Tuple of (transformed_df, updated_deid_ref_dict)
+
+        Raises:
+            ValueError: If required columns are not found
+            ValueError: If timeshift_df is not found in deid_ref_dict (when reverse=True)
+            ValueError: If the reference column contains null values (when reverse=False)
+            ValueError: If some values don't have shift mappings
 
         """
         deid_ref_dict = deid_ref_dict.copy()
         # Validate input
+        self._validate_datetime_deid_args(df)
+
+        # Handle empty DataFrame
+        if len(df) == 0:
+            if reverse:
+                return df.copy(), deid_ref_dict.copy()
+            else:
+                deid_ref_dict[self._timeshift_key()] = (
+                    self._get_and_update_timeshift_mappings(df, deid_ref_dict)
+                )
+                return df.copy(), deid_ref_dict.copy()
+
+        # Perform the timeshift operation.
+        timeshift_df = self._get_timeshift_reference(df, deid_ref_dict, reverse)
+        merged = self._merge_with_timeshift(df, timeshift_df)
+        self._validate_merge_success(df, merged, reverse)
+
+        # Prepare the outputs.
+        merged = self._apply_timeshift_to_column(merged, reverse)
+        merged = self._remove_shift_columns(merged)
+        updated_deid_ref_dict = deid_ref_dict.copy()
+        if not reverse:
+            updated_deid_ref_dict[self._timeshift_key()] = timeshift_df.copy()
+
+        return merged, updated_deid_ref_dict
+
+    def _get_column_to_cast(self) -> str | None:
+        """Get the column name to cast (the datetime column being de-identified)."""
+        return self.datetime_column
+
+    def _validate_datetime_deid_args(self, df: pd.DataFrame) -> None:
+        """
+        Validate that required columns exist in the DataFrame.
+
+        Args:
+            df: DataFrame to validate
+
+        Raises:
+            ValueError: If reference column or datetime column is not found
+
+        """
         if self.idconfig.name not in df.columns:
             raise ValueError(
                 f"Reference column '{self.idconfig.name}' not found in DataFrame"
@@ -182,49 +243,142 @@ class DateTimeDeidentifier(FilterableTransformer):
         if self.datetime_column not in df.columns:
             raise ValueError(f"Column '{self.datetime_column}' not found in DataFrame")
 
-        # Handle empty DataFrame
-        if len(df) == 0:
-            deid_ref_dict[self._timeshift_key()] = (
-                self._get_and_update_timeshift_mappings(df, deid_ref_dict)
-            )
-            return df.copy(), deid_ref_dict.copy()
+    def _get_timeshift_reference(
+        self,
+        df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame],
+        reverse: bool,
+    ) -> pd.DataFrame:
+        """
+        Get or create timeshift reference DataFrame based on mode.
 
-        # Get or create timeshift reference DataFrame
-        timeshift_df = self._get_and_update_timeshift_mappings(df, deid_ref_dict)
+        Args:
+            df: DataFrame containing the data to transform or reverse
+            deid_ref_dict: Dictionary of deidentification reference DataFrames
+            reverse: If True, get existing timeshift_df (must exist). If False, create/update mappings.
 
-        if df[self.idconfig.name].isna().any():
-            raise ValueError(
-                f"Reference column '{self.idconfig.name}' has null values. Time shift cannot be applied. Please ensure all reference values are non-null."
-            )
+        Returns:
+            DataFrame with reference values and their shift amounts
 
-        # Merge input DataFrame with timeshift reference DataFrame
-        merged = df.merge(
+        Raises:
+            ValueError: If timeshift_df is not found in deid_ref_dict (when reverse=True)
+            ValueError: If required columns are missing in timeshift_df (when reverse=True)
+            ValueError: If reference column has null values (when reverse=False)
+
+        """
+        if reverse:
+            # In reverse mode, timeshift_df must already exist
+            timeshift_df = deid_ref_dict.get(self._timeshift_key())
+            if timeshift_df is None:
+                raise ValueError(
+                    f"Time shift reference not found for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
+                )
+
+            if self.idconfig.uid not in timeshift_df.columns:
+                raise ValueError(
+                    f"UID column '{self.idconfig.uid}' not found in timeshift_df for transformer {self.uid or 'unnamed'}"
+                )
+
+            if self._timeshift_key() not in timeshift_df.columns:
+                raise ValueError(
+                    f"Shift column '{self._timeshift_key()}' not found in timeshift_df for transformer {self.uid or 'unnamed'}"
+                )
+        else:
+            # In forward mode, create/update timeshift mappings
+            timeshift_df = self._get_and_update_timeshift_mappings(df, deid_ref_dict)
+
+            # Validate that reference column has no nulls (only in forward mode)
+            if df[self.idconfig.name].isna().any():
+                raise ValueError(
+                    f"Reference column '{self.idconfig.name}' has null values. Time shift cannot be applied. Please ensure all reference values are non-null."
+                )
+
+        return timeshift_df
+
+    def _merge_with_timeshift(
+        self, df: pd.DataFrame, timeshift_df: pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Merge input DataFrame with timeshift reference DataFrame.
+
+        Args:
+            df: Input DataFrame to merge
+            timeshift_df: Timeshift reference DataFrame
+
+        Returns:
+            Merged DataFrame
+
+        """
+        return df.merge(
             timeshift_df[[self.idconfig.uid, self._timeshift_key()]],
             left_on=self.idconfig.name,
             right_on=self.idconfig.uid,
             how="inner",
         )
 
-        # Check if merge was successful (all non-null rows preserved)
-        if merged.shape[0] != df.shape[0]:
+    def _validate_merge_success(
+        self, original_df: pd.DataFrame, merged_df: pd.DataFrame, reverse: bool
+    ) -> None:
+        """
+        Validate that the merge operation was successful.
+
+        Args:
+            original_df: Original DataFrame before merge
+            merged_df: DataFrame after merge
+            reverse: Whether this is a reverse operation
+
+        Raises:
+            ValueError: If merge was not successful (rows were lost)
+
+        """
+        if merged_df.shape[0] != original_df.shape[0]:
+            operation = "reverse" if reverse else "processing"
             raise ValueError(
-                f"Time shift processing failed: original length {df.shape[0]}, "
-                f"processed length {merged.shape[0]}. Some reference values don't have shift mappings."
+                f"Time shift {operation} failed: original length {original_df.shape[0]}, "
+                f"processed length {merged_df.shape[0]}. Some reference values don't have shift mappings."
             )
 
-        # Apply time shift to the datetime column
-        merged[self.datetime_column] = self._apply_time_shift(
-            merged[self.datetime_column], merged[self._timeshift_key()]
-        )
+    def _apply_timeshift_to_column(
+        self, merged_df: pd.DataFrame, reverse: bool
+    ) -> pd.DataFrame:
+        """
+        Apply time shift to the datetime column (forward or reverse).
 
-        # Remove the shift column and reference column
-        merged.drop(columns=[self.idconfig.uid, self._timeshift_key()], inplace=True)
+        Args:
+            merged_df: DataFrame with merged timeshift data
+            reverse: If True, apply reverse shift. If False, apply forward shift.
 
-        # Update the deid_ref_dict with the timeshift DataFrame
-        updated_deid_ref_dict = deid_ref_dict.copy()
-        updated_deid_ref_dict[self._timeshift_key()] = timeshift_df.copy()
+        Returns:
+            DataFrame with shifted datetime column
 
-        return merged, updated_deid_ref_dict
+        """
+        if reverse:
+            merged_df[self.datetime_column] = self._apply_reverse_time_shift(
+                merged_df[self.datetime_column], merged_df[self._timeshift_key()]
+            )
+        else:
+            merged_df[self.datetime_column] = self._apply_time_shift(
+                merged_df[self.datetime_column], merged_df[self._timeshift_key()]
+            )
+        return merged_df
+
+    def _remove_shift_columns(self, merged_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Remove unnecessary shift columns and reference columns from merged DataFrame.
+
+        Args:
+            merged_df: DataFrame with shift columns to remove
+
+        Returns:
+            DataFrame with shift columns removed
+
+        """
+        columns_to_drop = [self._timeshift_key()]
+        if self.idconfig.uid != self.idconfig.name:
+            columns_to_drop.append(self.idconfig.uid)
+        if columns_to_drop:
+            merged_df = merged_df.drop(columns=columns_to_drop)
+        return merged_df
 
     def _get_and_update_timeshift_mappings(
         self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
@@ -288,6 +442,34 @@ class DateTimeDeidentifier(FilterableTransformer):
 
     def _timeshift_key(self) -> str:
         return f"{self.idconfig.uid}_shift"
+
+    def _get_column_to_cast(self) -> str | None:
+        """Get the column name to cast (the datetime column being de-identified)."""
+        return self.datetime_column
+
+    def _apply_reverse_time_shift(
+        self, datetime_series: pd.Series, shift_series: pd.Series
+    ) -> pd.Series:
+        """
+        Apply reverse time shift to datetime values (subtract shift instead of add).
+
+        Args:
+            datetime_series: Series of shifted datetime values to reverse
+            shift_series: Series of shift amounts to subtract
+
+        Returns:
+            Series of original datetime values
+
+        """
+        # Convert to datetime if not already
+        if not pd.api.types.is_datetime64_any_dtype(datetime_series):
+            datetime_series = pd.to_datetime(datetime_series)
+
+        # Apply negative shift by subtracting instead of adding
+        return datetime_series.combine(
+            shift_series,
+            lambda v, m: v - self.time_shift_generator._create_offset(int(m)),
+        )
 
 
 class TimeShiftGenerator(ABC):
