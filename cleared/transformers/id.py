@@ -130,17 +130,17 @@ class IDDeidentifier(FilterableTransformer):
         )
         if deid_ref_df is None:
             raise ValueError(
-                f"De-identification reference not found for transformer {self.uid} and identifier {self.idconfig.name}"
+                f"De-identification reference not found for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
             )
 
         if self.idconfig.deid_uid() not in deid_ref_df.columns:
             raise ValueError(
-                f"Deid column '{self.idconfig.deid_uid()}' not found in deid_ref_df for transformer {self.uid} and identifier {self.idconfig.name}"
+                f"Deid column '{self.idconfig.deid_uid()}' not found in deid_ref_df for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
             )
 
         if self.idconfig.uid not in deid_ref_df.columns:
             raise ValueError(
-                f"UID column '{self.idconfig.uid}' not found in deid_ref_df for transformer {self.uid} and identifier {self.idconfig.name}"
+                f"UID column '{self.idconfig.uid}' not found in deid_ref_df for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
             )
 
         # Inner join to ensure all values have mappings (raises error if some don't)
@@ -200,12 +200,12 @@ class IDDeidentifier(FilterableTransformer):
         )
         if self.idconfig.deid_uid() not in deid_ref_df.columns:
             raise ValueError(
-                f"Deid column '{self.idconfig.deid_uid()}' not found in deid_ref_df for transformer {self.uid} and identifier {self.idconfig.name}"
+                f"Deid column '{self.idconfig.deid_uid()}' not found in deid_ref_df for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
             )
 
         if self.idconfig.uid not in deid_ref_df.columns:
             raise ValueError(
-                f"UID of the identifier column '{self.idconfig.uid}' not found in deid_ref_df for transformer {self.uid}"
+                f"UID of the identifier column '{self.idconfig.uid}' not found in deid_ref_df for transformer {self.uid or 'unnamed'}"
             )
 
         # Get unique values from the reference column

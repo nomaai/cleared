@@ -271,17 +271,17 @@ class DateTimeDeidentifier(FilterableTransformer):
             timeshift_df = deid_ref_dict.get(self._timeshift_key())
             if timeshift_df is None:
                 raise ValueError(
-                    f"Time shift reference not found for transformer {self.uid} and identifier {self.idconfig.name}"
+                    f"Time shift reference not found for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
                 )
 
             if self.idconfig.uid not in timeshift_df.columns:
                 raise ValueError(
-                    f"UID column '{self.idconfig.uid}' not found in timeshift_df for transformer {self.uid}"
+                    f"UID column '{self.idconfig.uid}' not found in timeshift_df for transformer {self.uid or 'unnamed'}"
                 )
 
             if self._timeshift_key() not in timeshift_df.columns:
                 raise ValueError(
-                    f"Shift column '{self._timeshift_key()}' not found in timeshift_df for transformer {self.uid}"
+                    f"Shift column '{self._timeshift_key()}' not found in timeshift_df for transformer {self.uid or 'unnamed'}"
                 )
         else:
             # In forward mode, create/update timeshift mappings
