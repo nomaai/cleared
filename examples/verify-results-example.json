@@ -1,0 +1,85 @@
+{
+    "overview": {
+      "total_tables": 2,
+      "passed_tables": 1,
+      "failed_tables": 1,
+      "warning_tables": 0,
+      "total_errors": 2,
+      "total_warnings": 0,
+      "total_columns_checked": 4,
+      "total_columns_passed": 2,
+      "total_columns_errored": 2,
+      "total_columns_warned": 0
+    },
+    "tables": [
+      {
+        "table_name": "users",
+        "status": "pass",
+        "total_columns": 2,
+        "passed_columns": 2,
+        "error_columns": 0,
+        "warning_columns": 0,
+        "errors": [],
+        "warnings": [],
+        "column_results": [
+          {
+            "column_name": "id",
+            "status": "pass",
+            "message": "Column 'id' matches perfectly",
+            "original_length": 10,
+            "reversed_length": 10,
+            "mismatch_count": 0,
+            "mismatch_percentage": 0.0,
+            "sample_mismatch_indices": []
+          },
+          {
+            "column_name": "name",
+            "status": "pass",
+            "message": "Column 'name' matches perfectly",
+            "original_length": 10,
+            "reversed_length": 10,
+            "mismatch_count": 0,
+            "mismatch_percentage": 0.0,
+            "sample_mismatch_indices": []
+          }
+        ]
+      },
+      {
+        "table_name": "orders",
+        "status": "error",
+        "total_columns": 2,
+        "passed_columns": 0,
+        "error_columns": 2,
+        "warning_columns": 0,
+        "errors": [
+          "Column 'order_id' has 5 mismatches (50.00%)",
+          "Column 'amount' length mismatch: original has 10 rows, reversed has 8 rows"
+        ],
+        "warnings": [],
+        "column_results": [
+          {
+            "column_name": "order_id",
+            "status": "error",
+            "message": "Column 'order_id' has 5 mismatches (50.00%)",
+            "original_length": 10,
+            "reversed_length": 10,
+            "mismatch_count": 5,
+            "mismatch_percentage": 50.0,
+            "sample_mismatch_indices": [0, 1, 2, 3, 4]
+          },
+          {
+            "column_name": "amount",
+            "status": "error",
+            "message": "Column 'amount' length mismatch: original has 10 rows, reversed has 8 rows",
+            "original_length": 10,
+            "reversed_length": 8,
+            "mismatch_count": 0,
+            "mismatch_percentage": 0.0,
+            "sample_mismatch_indices": []
+          }
+        ]
+      }
+    ],
+    "config_path": "test_config.yaml",
+    "reverse_data_path": "/tmp/reversed_data"
+  }

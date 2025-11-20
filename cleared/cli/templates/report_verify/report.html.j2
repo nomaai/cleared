@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cleared Verification Report - {{ config_name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            font-family: 'Public Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        
+        @media print {
+            .no-print { display: none; }
+            .print-break { page-break-after: always; }
+        }
+        
+        :root {
+            --primary: #14204a;
+            --heading: #60a5fa;
+            --info-heading: #000000;
+            --border: #dbeafe;
+            --positive: #dc262699;
+            --negative: #16a34a99;
+            --gray-300: #d1d5db;
+            --gray-600: #4b5563;
+            --secondary: #8592a3;
+            --success: #16a34a;
+            --info: #3b82f6;
+            --warning: #f59e0b;
+            --danger: #dc2626;
+            --dark: #1f2937;
+            --light: #f9fafb;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+            min-height: 100vh;
+        }
+        
+        .badge {
+            @apply inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-semibold;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+        }
+        .badge-primary { 
+            background: var(--primary);
+            color: white;
+        }
+        .badge-success { 
+            background: var(--success);
+            color: white;
+        }
+        .badge-warning { 
+            background: var(--warning);
+            color: white;
+        }
+        .badge-danger { 
+            background: var(--danger);
+            color: white;
+        }
+        .badge-info { 
+            background: var(--info);
+            color: white;
+        }
+        
+        .card {
+            @apply bg-white rounded-xl shadow-lg border-0;
+            padding: 1.4rem;
+            margin-bottom: 2.5rem;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
+            border: 1px solid var(--border);
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+        }
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card {
+            @apply bg-white rounded-xl shadow-lg border-0;
+            padding: 1.4rem;
+            margin-bottom: 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            border: 1px solid var(--border);
+        }
+        .stat-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+        }
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            opacity: 0.1;
+            transform: translate(30px, -30px);
+        }
+        .stat-card.primary::before { background: var(--primary); }
+        .stat-card.success::before { background: var(--success); }
+        .stat-card.warning::before { background: var(--warning); }
+        .stat-card.danger::before { background: var(--danger); }
+        .stat-card.info::before { background: var(--info); }
+        
+        .section-title {
+            @apply text-2xl font-bold mb-6;
+            color: var(--info-heading);
+            position: relative;
+            padding-bottom: 1rem;
+        }
+        .section-title::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 60px;
+            height: 4px;
+            background: var(--heading);
+            border-radius: 2px;
+        }
+        
+        .icon-wrapper {
+            @apply inline-flex items-center justify-center w-10 h-10 rounded-lg;
+            background: rgba(20, 32, 74, 0.1);
+            color: var(--primary);
+        }
+        
+        .header-gradient {
+            background: linear-gradient(135deg, var(--primary) 0%, #1e3a5f 100%);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        .status-badge.pass {
+            background: rgba(22, 163, 74, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(22, 163, 74, 0.3);
+        }
+        .status-badge.error {
+            background: rgba(220, 38, 38, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(220, 38, 38, 0.3);
+        }
+        .status-badge.warning {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+        
+        .table-text {
+            color: var(--gray-600);
+            font-size: 0.875rem;
+            font-weight: 400;
+        }
+        
+        .table-text-bold {
+            color: var(--dark);
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header-gradient shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="flex items-center justify-between">
+                <div class="text-white">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="icon-wrapper bg-white/20 backdrop-blur-sm">
+                            <i class='bx bx-check-circle text-2xl'></i>
+                        </div>
+                        <div>
+                            <h1 class="text-3xl font-bold">Cleared Verification Report</h1>
+                            <p class="mt-1 text-lg text-white/90 flex items-center gap-2">
+                                <i class='bx bx-file-blank text-xl'></i>
+                                {{ config_name }}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-right text-white/90">
+                    <div class="flex items-center gap-2 mb-1">
+                        <i class='bx bx-calendar text-lg'></i>
+                        <p class="text-sm font-medium">{{ generated_at }}</p>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <i class='bx bx-code-alt text-lg'></i>
+                        <p class="text-sm">Cleared v{{ version }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="w-full py-8" style="width: 100%; max-width: 100%; box-sizing: border-box;">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" style="width: 100%; max-width: 100%; box-sizing: border-box;">
+            <!-- Overview Section -->
+            <section id="overview" class="card">
+                <h2 class="section-title flex items-center gap-3">
+                    <i class='bx bx-bar-chart-alt-2 text-3xl text-primary'></i>
+                    Overview
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="stat-card primary" style="margin-bottom: 0;">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600 mb-1">Total Tables</p>
+                                <h3 class="text-4xl font-bold text-gray-900">{{ overview.total_tables }}</h3>
+                            </div>
+                            <div class="icon-wrapper">
+                                <i class='bx bx-table text-2xl'></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card success" style="margin-bottom: 0;">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600 mb-1">Passed Tables</p>
+                                <h3 class="text-4xl font-bold text-gray-900">{{ overview.passed_tables }}</h3>
+                            </div>
+                            <div class="icon-wrapper">
+                                <i class='bx bx-check-circle text-2xl'></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card danger" style="margin-bottom: 0;">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600 mb-1">Failed Tables</p>
+                                <h3 class="text-4xl font-bold text-gray-900">{{ overview.failed_tables }}</h3>
+                            </div>
+                            <div class="icon-wrapper">
+                                <i class='bx bx-x-circle text-2xl'></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card warning" style="margin-bottom: 0;">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600 mb-1">Warning Tables</p>
+                                <h3 class="text-4xl font-bold text-gray-900">{{ overview.warning_tables }}</h3>
+                            </div>
+                            <div class="icon-wrapper">
+                                <i class='bx bx-error-circle text-2xl'></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
+                    <div class="stat-card info" style="margin-bottom: 0;">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600 mb-1">Total Errors</p>
+                                <h3 class="text-4xl font-bold text-gray-900">{{ overview.total_errors }}</h3>
+                            </div>
+                            <div class="icon-wrapper">
+                                <i class='bx bx-error text-2xl'></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card warning" style="margin-bottom: 0;">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600 mb-1">Total Warnings</p>
+                                <h3 class="text-4xl font-bold text-gray-900">{{ overview.total_warnings }}</h3>
+                            </div>
+                            <div class="icon-wrapper">
+                                <i class='bx bx-error-circle text-2xl'></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card success" style="margin-bottom: 0;">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600 mb-1">Columns Passed</p>
+                                <h3 class="text-4xl font-bold text-gray-900">{{ overview.total_columns_passed }}</h3>
+                            </div>
+                            <div class="icon-wrapper">
+                                <i class='bx bx-check text-2xl'></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="stat-card primary" style="margin-bottom: 0;">
+                        <div class="flex items-center justify-between mb-4">
+                            <div>
+                                <p class="text-sm font-semibold text-gray-600 mb-1">Columns Checked</p>
+                                <h3 class="text-4xl font-bold text-gray-900">{{ overview.total_columns_checked }}</h3>
+                            </div>
+                            <div class="icon-wrapper">
+                                <i class='bx bx-list-check text-2xl'></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Tables Section -->
+            <section id="tables" class="card">
+                <h2 class="section-title flex items-center gap-3">
+                    <i class='bx bx-table text-3xl text-primary'></i>
+                    Table Verification Results
+                </h2>
+                {% for table in tables %}
+                <div id="table-{{ table.table_name }}" class="mb-10 pb-10 border-b-2 border-gray-100 last:border-b-0 last:pb-0 last:mb-0">
+                    <div class="flex items-center justify-between mb-5">
+                        <div class="flex items-center gap-3">
+                            <div class="icon-wrapper">
+                                <i class='bx bx-table text-xl'></i>
+                            </div>
+                            <h3 class="text-2xl font-bold text-gray-900">{{ table.table_name }}</h3>
+                            <span class="status-badge {{ table.status }}">
+                                {{ table.status }}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-4 text-sm text-gray-600">
+                            <span class="flex items-center gap-1">
+                                <i class='bx bx-check text-lg text-green-600'></i>
+                                {{ table.passed_columns }} passed
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <i class='bx bx-x text-lg text-red-600'></i>
+                                {{ table.error_columns }} errors
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <i class='bx bx-error-circle text-lg text-yellow-600'></i>
+                                {{ table.warning_columns }} warnings
+                            </span>
+                        </div>
+                    </div>
+
+                    {% if table.column_results %}
+                    <div class="overflow-x-auto" style="width: 100%; max-width: 100%; box-sizing: border-box;">
+                        <table class="w-full border-collapse" style="border: 1px solid var(--border); width: 100%; max-width: 100%; table-layout: fixed; box-sizing: border-box;">
+                            <thead>
+                                <tr class="bg-gray-50">
+                                    <th class="text-left py-3 px-4 font-semibold text-gray-700" style="border: 1px solid var(--border); width: 20%;">
+                                        Column Name
+                                    </th>
+                                    <th class="text-left py-3 px-4 font-semibold text-gray-700" style="border: 1px solid var(--border); width: 15%;">
+                                        Status
+                                    </th>
+                                    <th class="text-left py-3 px-4 font-semibold text-gray-700" style="border: 1px solid var(--border); width: 15%;">
+                                        Original Length
+                                    </th>
+                                    <th class="text-left py-3 px-4 font-semibold text-gray-700" style="border: 1px solid var(--border); width: 15%;">
+                                        Reversed Length
+                                    </th>
+                                    <th class="text-left py-3 px-4 font-semibold text-gray-700" style="border: 1px solid var(--border); width: 10%;">
+                                        Mismatches
+                                    </th>
+                                    <th class="text-left py-3 px-4 font-semibold text-gray-700" style="border: 1px solid var(--border); width: 25%;">
+                                        Message
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for column in table.column_results %}
+                                <tr class="hover:bg-gray-50 transition-colors">
+                                    <td class="py-4 px-4" style="border: 1px solid var(--border);">
+                                        <span class="table-text-bold">{{ column.column_name }}</span>
+                                    </td>
+                                    <td class="py-4 px-4" style="border: 1px solid var(--border);">
+                                        <span class="status-badge {{ column.status }}">
+                                            {{ column.status }}
+                                        </span>
+                                    </td>
+                                    <td class="py-4 px-4" style="border: 1px solid var(--border);">
+                                        <span class="table-text">{{ column.original_length }}</span>
+                                    </td>
+                                    <td class="py-4 px-4" style="border: 1px solid var(--border);">
+                                        <span class="table-text">{{ column.reversed_length }}</span>
+                                    </td>
+                                    <td class="py-4 px-4" style="border: 1px solid var(--border);">
+                                        {% if column.mismatch_count > 0 %}
+                                        <span class="table-text-bold text-red-600">
+                                            {{ column.mismatch_count }} ({{ "%.2f"|format(column.mismatch_percentage) }}%)
+                                        </span>
+                                        {% else %}
+                                        <span class="table-text">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="py-4 px-4" style="border: 1px solid var(--border);">
+                                        <span class="table-text">{{ column.message }}</span>
+                                        {% if column.sample_mismatch_indices and column.sample_mismatch_indices|length > 0 %}
+                                        <div class="mt-1 text-xs text-gray-500">
+                                            Sample indices: {{ column.sample_mismatch_indices[:10]|join(', ') }}{% if column.sample_mismatch_indices|length > 10 %}...{% endif %}
+                                        </div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="bg-gray-50 rounded-xl text-center" style="padding: 1.4rem; border: 1px solid var(--border);">
+                        <i class='bx bx-info-circle text-4xl text-gray-400 mb-3'></i>
+                        <p class="text-gray-500 italic">No column results available for this table.</p>
+                    </div>
+                    {% endif %}
+
+                    {% if table.errors %}
+                    <div class="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <h4 class="text-sm font-semibold text-red-800 mb-2 flex items-center gap-2">
+                            <i class='bx bx-error text-lg'></i>
+                            Errors ({{ table.errors|length }})
+                        </h4>
+                        <ul class="list-disc list-inside text-sm text-red-700 space-y-1">
+                            {% for error in table.errors[:10] %}
+                            <li>{{ error }}</li>
+                            {% endfor %}
+                            {% if table.errors|length > 10 %}
+                            <li class="text-red-500 italic">... and {{ table.errors|length - 10 }} more errors</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    {% endif %}
+
+                    {% if table.warnings %}
+                    <div class="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <h4 class="text-sm font-semibold text-yellow-800 mb-2 flex items-center gap-2">
+                            <i class='bx bx-error-circle text-lg'></i>
+                            Warnings ({{ table.warnings|length }})
+                        </h4>
+                        <ul class="list-disc list-inside text-sm text-yellow-700 space-y-1">
+                            {% for warning in table.warnings[:10] %}
+                            <li>{{ warning }}</li>
+                            {% endfor %}
+                            {% if table.warnings|length > 10 %}
+                            <li class="text-yellow-500 italic">... and {{ table.warnings|length - 10 }} more warnings</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </section>
+
+            <!-- Configuration Info Section -->
+            <section id="config-info" class="card">
+                <h2 class="section-title flex items-center gap-3">
+                    <i class='bx bx-info-circle text-3xl text-primary'></i>
+                    Configuration Information
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-gray-50 rounded-xl p-4" style="border: 1px solid var(--border);">
+                        <div class="flex items-center gap-3 mb-3">
+                            <i class='bx bx-file text-xl text-primary'></i>
+                            <span class="text-sm font-semibold text-gray-700">Config Path</span>
+                        </div>
+                        <code class="text-sm break-all">{{ config_path }}</code>
+                    </div>
+                    <div class="bg-gray-50 rounded-xl p-4" style="border: 1px solid var(--border);">
+                        <div class="flex items-center gap-3 mb-3">
+                            <i class='bx bx-folder text-xl text-primary'></i>
+                            <span class="text-sm font-semibold text-gray-700">Reverse Data Path</span>
+                        </div>
+                        <code class="text-sm break-all">{{ reverse_data_path }}</code>
+                    </div>
+                </div>
+                {% if json_file %}
+                <div class="mt-4 bg-gray-50 rounded-xl p-4" style="border: 1px solid var(--border);">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class='bx bx-code-alt text-xl text-primary'></i>
+                        <span class="text-sm font-semibold text-gray-700">Source JSON File</span>
+                    </div>
+                    <code class="text-sm break-all">{{ json_file }}</code>
+                </div>
+                {% endif %}
+            </section>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t-2 border-gray-100 mt-12 py-8 no-print">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-2" style="color: var(--gray-600);">
+                    <i class='bx bx-code-alt text-xl'></i>
+                    <p class="text-sm">Generated by <a href="https://github.com/nomaai/cleared" style="color: var(--primary);" class="font-semibold hover:underline">Cleared</a> v{{ version }}</p>
+                </div>
+                <div class="flex items-center gap-4 text-sm text-gray-500">
+                    <span class="flex items-center gap-1">
+                        <i class='bx bx-calendar'></i>
+                        {{ generated_at }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Smooth scrolling for navigation links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+
