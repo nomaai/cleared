@@ -46,6 +46,7 @@
 | ✅ **Conditional De-identification** |  Ability to only apply de-identification rules|
 | ✅ **Pseudonymization Engine** | Deterministic, reversible pseudonyms for longitudinal tracking |
 | ✅ **Reverse De-identification** | Restore original values from de-identified data using reference mappings |
+| ✅ **Verify De-identification** | Verify that reversed data matches original data with comprehensive comparison and HTML reporting |
 | ✅ **Custom Transformers PLugins** | Supports implementation of plugins for custom de-identification filters and methods  |
 | ✅ **Healthcare-Ready Defaults** | Includes mappings for demographics, identifiers, and care events |
 | ✅ **Configuration Reusability** | Leverages the well-known hydra configuration yaml file to facilitate reusability of existing configs, partial configuration imoporting, configuration inheritencfe and customizations |
