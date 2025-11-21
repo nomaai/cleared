@@ -8,11 +8,15 @@ and de-identification workflows with different scopes and configurations.
 from __future__ import annotations
 
 import pandas as pd
+import logging
+from pathlib import Path
 
 from .base import Pipeline, BaseTransformer
 from ..io import BaseDataLoader
 from ..config.structure import IOConfig, DeIDConfig, PairedIOConfig
-from pathlib import Path
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 
 class TablePipeline(Pipeline):
@@ -151,40 +155,81 @@ class TablePipeline(Pipeline):
 
         # Read table if no DataFrame provided
         if df is None:
+            logger.debug(f"    Reading table '{self.table_name}' from data source")
             try:
                 with self._create_data_loader(read_config) as data_loader:
                     df = data_loader.read_table(self.table_name, rows_limit=rows_limit)
+                logger.info(f"    Read table '{self.table_name}' ({len(df)} rows)")
             except Exception as e:
-                raise ValueError(
-                    f"Failed to read table '{self.table_name}': {e!s}"
-                ) from e
+                error_msg = f"Failed to read table '{self.table_name}': {e!s}"
+                logger.error(f"    {error_msg}")
+                raise ValueError(error_msg) from e
 
         # Build empty de-identification reference if not provided
         if deid_ref_dict is None:
             deid_ref_dict = {}
 
         # Process with base pipeline (use reverse() if in reverse mode)
-        if reverse:
-            df, deid_ref_dict = super().reverse(df, deid_ref_dict)
-        else:
-            df, deid_ref_dict = super().transform(df, deid_ref_dict)
+        try:
+            if reverse:
+                df, deid_ref_dict = super().reverse(df, deid_ref_dict)
+            else:
+                df, deid_ref_dict = super().transform(df, deid_ref_dict)
+        except (ValueError, KeyError, AttributeError) as e:
+            # Check if it's a DataFrame-related error
+            error_str = str(e)
+            error_lower = error_str.lower()
+            if any(
+                keyword in error_lower
+                for keyword in [
+                    "column",
+                    "not found",
+                    "dataframe",
+                    "index",
+                    "key",
+                    "missing",
+                ]
+            ):
+                # If error is already formatted (contains "Missing Column Error" or has newlines), re-raise as-is
+                # Otherwise, add table context
+                from .base import FormattedDataFrameError
+
+                if "Missing Column Error" in error_str or "\n" in error_str:
+                    # Already formatted, don't add prefix
+                    raise FormattedDataFrameError(error_str) from e
+                else:
+                    # Not formatted yet, add table context
+                    enhanced_error = (
+                        f"Error processing table '{self.table_name}': {e!s}"
+                    )
+                    raise ValueError(enhanced_error) from e
+            # Re-raise other errors as-is
+            raise
 
         # Write data to the appropriate location (skip in test mode)
         if not test_mode:
             if reverse:
                 # Write to reverse output path
                 if reverse_output_config is None:
-                    raise ValueError(
-                        "reverse_output_config is required when reverse=True"
-                    )
+                    error_msg = "reverse_output_config is required when reverse=True"
+                    logger.error(f"    {error_msg}")
+                    raise ValueError(error_msg)
+                logger.debug(
+                    f"    Writing reversed table '{self.table_name}' to reverse output path"
+                )
                 with self._create_data_loader(reverse_output_config) as data_loader:
                     data_loader.write_deid_table(df, self.table_name)
+                logger.info(
+                    f"    Wrote reversed table '{self.table_name}' ({len(df)} rows)"
+                )
             else:
                 # Write to normal output config
+                logger.debug(f"    Writing table '{self.table_name}' to output")
                 with self._create_data_loader(
                     self.io_config.output_config
                 ) as data_loader:
                     data_loader.write_deid_table(df, self.table_name)
+                logger.info(f"    Wrote table '{self.table_name}' ({len(df)} rows)")
 
         return df, deid_ref_dict
 
@@ -216,7 +261,9 @@ class TablePipeline(Pipeline):
             read_config = io_config.output_config
             # Create reverse output config pointing to reverse_output_path
             if reverse_output_path is None:
-                raise ValueError("reverse_output_path is required when reverse=True")
+                error_msg = "reverse_output_path is required when reverse=True"
+                logger.error(f"Pipeline {self.uid} {error_msg}")
+                raise ValueError(error_msg)
 
             reverse_output_path = Path(reverse_output_path)
             reverse_output_path.mkdir(parents=True, exist_ok=True)

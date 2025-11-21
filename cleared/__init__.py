@@ -21,6 +21,7 @@ from .config import (
 )
 from .engine import ClearedEngine
 from .sample import sample_data
+from .logging_config import setup_logging, get_logger
 
 __all__ = [
     "ClearedConfig",
@@ -38,5 +39,7 @@ __all__ = [
     "TablePipeline",
     "TimeShiftConfig",
     "TransformerRegistry",
+    "get_logger",
     "sample_data",
+    "setup_logging",
 ]

@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 import os
 import glob
 import json
+import logging
 
 from datetime import datetime
 from .config.structure import (
@@ -23,8 +24,11 @@ from .config.structure import (
     TransformerConfig,
 )
 from .transformers.pipelines import TablePipeline
-from .transformers.base import Pipeline
+from .transformers.base import Pipeline, FilterableTransformer, FormattedDataFrameError
 from .transformers.registry import TransformerRegistry
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -160,11 +164,20 @@ class ClearedEngine:
                       Defaults to None.
 
         """
+        logger.info(f"Initializing ClearedEngine: {name}")
+        logger.debug(f"Provided pipelines: {len(pipelines) if pipelines else 0}")
+        logger.debug(f"Registry provided: {registry is not None}")
+
         self._pipelines = pipelines if pipelines is not None else []
         self._registry = (
             registry if registry is not None else TransformerRegistry(use_defaults=True)
         )
         self._setup_and_validate(name, deid_config, io_config)
+
+        logger.info(
+            f"ClearedEngine '{name}' initialized successfully with UID: {self._uid}"
+        )
+        logger.debug(f"Total pipelines configured: {len(self._pipelines)}")
 
     @classmethod
     def from_config(
@@ -181,20 +194,31 @@ class ClearedEngine:
             ClearedEngine instance configured from the provided config
 
         """
+        logger.info(f"Creating ClearedEngine from config: {config.name}")
+        logger.debug(f"Config contains {len(config.tables)} table(s)")
+
         engine = cls.__new__(cls)
         engine._init_from_config(config, registry)
+
+        logger.info(
+            f"ClearedEngine created from config with {len(engine._pipelines)} pipeline(s)"
+        )
         return engine
 
     def _setup_and_validate(
         self, name: str, deid_config: DeIDConfig, io_config: ClearedIOConfig
     ) -> None:
         """Set the properties of the engine."""
+        logger.debug(f"Setting up engine properties for: {name}")
         self.name = name
         self.deid_config = deid_config
         self.io_config = io_config
         self.results: dict[str, Any] = {}
         self._uid = f"{name}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        logger.debug(f"Generated engine UID: {self._uid}")
+        logger.debug("Validating IO configuration...")
         self._validate_io_config()
+        logger.debug("IO configuration validation passed")
 
     def _init_from_config(
         self, config: ClearedConfig, registry: TransformerRegistry | None = None
@@ -207,11 +231,14 @@ class ClearedEngine:
             registry: TransformerRegistry to use. Defaults to new registry with default transformers.
 
         """
+        logger.debug("Initializing engine from configuration")
         self._setup_and_validate(config.name, config.deid_config, config.io)
         self._registry = (
             registry if registry is not None else TransformerRegistry(use_defaults=True)
         )
+        logger.info(f"Loading {len(config.tables)} pipeline(s) from configuration")
         self._pipelines = self._load_pipelines_from_config(config)
+        logger.info(f"Loaded {len(self._pipelines)} pipeline(s) from configuration")
 
     def _create_transformer_config_dict(
         self, transformer_config: TransformerConfig
@@ -229,8 +256,9 @@ class ClearedEngine:
             Dictionary of configuration arguments for transformer instantiation
 
         """
-        from .transformers.base import FilterableTransformer
-
+        logger.debug(
+            f"Creating config dict for transformer: {transformer_config.method}"
+        )
         # Start with the base configs
         config_dict = {**transformer_config.configs}
 
@@ -246,25 +274,33 @@ class ClearedEngine:
         except (TypeError, AttributeError):
             # If transformer_class is not a real class (e.g., a mock), default to False
             supports_filter_and_cast = False
+            logger.debug(
+                f"Could not determine if {transformer_config.method} supports filter/cast, defaulting to False"
+            )
 
         # Add filter_config if present and class supports it
         if transformer_config.filter is not None:
             if supports_filter_and_cast:
+                logger.debug(f"Adding filter_config to {transformer_config.method}")
                 config_dict["filter_config"] = transformer_config.filter
             else:
-                raise ValueError(
-                    f"Transformer {transformer_config.method} does not support filter_config but it was provided!"
-                )
+                error_msg = f"Transformer {transformer_config.method} does not support filter_config but it was provided!"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
 
         # Add value_cast if present and class supports it
         if transformer_config.value_cast is not None:
             if supports_filter_and_cast:
+                logger.debug(f"Adding value_cast to {transformer_config.method}")
                 config_dict["value_cast"] = transformer_config.value_cast
             else:
-                raise ValueError(
-                    f"Transformer {transformer_config.method} does not support value_cast but it was provided!"
-                )
+                error_msg = f"Transformer {transformer_config.method} does not support value_cast but it was provided!"
+                logger.error(error_msg)
+                raise ValueError(error_msg)
 
+        logger.debug(
+            f"Config dict created for {transformer_config.method} with {len(config_dict)} key(s)"
+        )
         return config_dict
 
     def _load_pipelines_from_config(self, config: ClearedConfig) -> list[TablePipeline]:
@@ -277,8 +313,16 @@ class ClearedEngine:
         """
         pipelines = []
         for table_name, table_config in config.tables.items():
-            pip = TablePipeline(table_name, config.io.data, config.deid_config)
-            for transformer_config in table_config.transformers:
+            logger.info(
+                f"  → Loading pipeline: {table_name} ({len(table_config.transformers)} transformer(s))"
+            )
+            pip = TablePipeline(
+                table_name, config.io.data, config.deid_config, uid=table_name
+            )
+            for idx, transformer_config in enumerate(table_config.transformers):
+                logger.debug(
+                    f"    Adding transformer {idx + 1}/{len(table_config.transformers)}: {transformer_config.method}"
+                )
                 # Create complete config dict including filter_config and value_cast
                 config_dict = self._create_transformer_config_dict(transformer_config)
 
@@ -286,13 +330,40 @@ class ClearedEngine:
                 transformer = self._registry.instantiate(
                     transformer_config.method,
                     config_dict,
+                    uid=transformer_config.uid,
                     global_deid_config=config.deid_config,
                 )
 
                 pip.add_transformer(transformer)
+                logger.debug(
+                    f"    Transformer '{transformer_config.method}' added successfully"
+                )
 
             pipelines.append(pip)
+            logger.info(f"  ✓ Pipeline '{table_name}' loaded (UID: {pip.uid})")
         return pipelines
+
+    def _log_execution_start(
+        self,
+        reverse: bool,
+        test_mode: bool,
+        continue_on_error: bool,
+        rows_limit: int | None,
+    ) -> None:
+        """Log execution start information."""
+        mode_str = "REVERSE" if reverse else "NORMAL"
+        row_limit_str = f", row_limit={rows_limit}" if rows_limit else ""
+        logger.info(
+            f"Starting ClearedEngine execution (UID: {self._uid}, mode={mode_str}, test_mode={test_mode}, continue_on_error={continue_on_error}{row_limit_str})"
+        )
+
+    def _log_execution_summary(self, results: Results) -> None:
+        """Log execution summary."""
+        successful_count = len(results.get_successful_pipelines())
+        failed_count = results.get_error_count()
+        logger.info(
+            f"Execution completed: {len(results.execution_order)} total, {successful_count} successful, {failed_count} failed, overall_success={results.success}"
+        )
 
     def run(
         self,
@@ -328,17 +399,27 @@ class ClearedEngine:
             RuntimeError: If pipeline execution fails and continue_on_error is False
 
         """
+        self._log_execution_start(reverse, test_mode, continue_on_error, rows_limit)
+
         if self._pipelines is None or len(self._pipelines) == 0:
+            logger.error("No pipelines configured")
             raise ValueError("No pipelines configured. Add pipelines before running.")
 
+        logger.info(f"Executing {len(self._pipelines)} pipeline(s)")
+
         # Initialize de-identification reference dictionary
+        logger.debug("Loading initial de-identification reference dictionary")
         current_deid_ref_dict = self._load_initial_deid_ref_dict()
+        # Note: _load_initial_deid_ref_dict already logs the total count
 
         # Initialize results
         results = Results()
 
         # Execute each pipeline
-        for table_pipeline in self._pipelines:
+        for idx, table_pipeline in enumerate(self._pipelines):
+            logger.info(
+                f"  → Pipeline {idx + 1}/{len(self._pipelines)}: {table_pipeline.uid}"
+            )
             current_deid_ref_dict = self._run_table_pipeline(
                 table_pipeline,
                 results,
@@ -355,10 +436,15 @@ class ClearedEngine:
 
         # Skip saving outputs in test mode
         if not test_mode:
+            logger.debug("Saving execution results")
             self._save_results(results)
+            logger.debug("Saving de-identification reference files")
             # Save de-identification reference files
             self._save_deid_ref_files(current_deid_ref_dict)
+        else:
+            logger.info("  Test mode: Skipping output file writes")
 
+        self._log_execution_summary(results)
         return results
 
     def _run_table_pipeline(
@@ -395,11 +481,19 @@ class ClearedEngine:
         pipeline_uid = table_pipeline.uid
         results.add_execution_order(pipeline_uid)
 
+        logger.debug(f"    Starting execution of pipeline: {pipeline_uid}")
+        logger.debug(
+            f"    Current deid_ref_dict contains {len(current_deid_ref_dict)} reference(s)"
+        )
+
         try:
             # Run the pipeline
             if hasattr(table_pipeline, "transform") and callable(
                 table_pipeline.transform
             ):
+                logger.debug(
+                    f"    Pipeline {pipeline_uid} has transform method, executing..."
+                )
                 # Pipeline has transform method - execute it
                 _, updated_deid_ref_dict = self._call_pipeline(
                     pipeline=table_pipeline,
@@ -413,26 +507,80 @@ class ClearedEngine:
 
                 # Store pipeline result
                 results.add_pipeline_result(pipeline_uid, "success")
+                logger.info(f"  ✓ Pipeline {pipeline_uid} completed successfully")
+                logger.debug(
+                    f"    Updated deid_ref_dict now contains {len(updated_deid_ref_dict)} reference(s)"
+                )
                 return updated_deid_ref_dict
             else:
+                error_msg = f"Pipeline {pipeline_uid} does not have a transform method"
+                logger.error(f"    {error_msg}")
                 results.add_pipeline_result(
                     pipeline_uid,
                     "error",
-                    f"Pipeline {pipeline_uid} does not have a transform method",
+                    error_msg,
                 )
                 return current_deid_ref_dict
 
         except Exception as e:
-            results.add_pipeline_result(
-                pipeline_uid, "error", f"Pipeline {pipeline_uid} failed: {e!s}"
-            )
+            # Check if it's a formatted DataFrame error
+            is_formatted_error = isinstance(e, FormattedDataFrameError)
+
+            if is_formatted_error:
+                # For formatted errors, don't log - let CLI handle display
+                error_msg = str(e)
+            else:
+                # Check error type - filter errors should be checked first
+                error_str = str(e)
+                error_lower = error_str.lower()
+
+                # Check if it's a filter condition error (should be RuntimeError)
+                is_filter_error = "invalid filter condition" in error_lower
+
+                # Check if it's a DataFrame-related error (but not a filter error)
+                is_dataframe_error = not is_filter_error and any(
+                    keyword in error_lower
+                    for keyword in [
+                        "column",
+                        "not found",
+                        "dataframe",
+                        "index",
+                        "key",
+                        "missing",
+                    ]
+                )
+
+                if is_dataframe_error:
+                    error_msg = error_str
+                elif is_filter_error:
+                    # Filter errors should be RuntimeError
+                    error_msg = error_str
+                else:
+                    # For other errors, include more context and traceback
+                    error_msg = f"Pipeline {pipeline_uid} failed: {e!s}"
+                    logger.error(error_msg, exc_info=True)
+
+            results.add_pipeline_result(pipeline_uid, "error", error_msg)
 
             # Stop execution if not continuing on error
             if not continue_on_error:
                 results.set_success(False)
-                raise RuntimeError(f"Pipeline execution failed: {e!s}") from e
+                # For formatted errors, re-raise as-is (CLI will handle display)
+                if is_formatted_error:
+                    raise
+                elif is_dataframe_error:
+                    # Use ValueError so CLI can detect and handle it properly
+                    raise ValueError(error_msg) from None
+                elif is_filter_error:
+                    # Filter errors should be RuntimeError
+                    raise RuntimeError(error_msg) from e
+                else:
+                    raise RuntimeError(f"Pipeline execution failed: {e!s}") from e
 
             # If continuing on error, return the unchanged deid_ref_dict
+            logger.warning(
+                "    Continuing execution despite pipeline failure (continue_on_error=True)"
+            )
             return current_deid_ref_dict
 
     def _call_pipeline(
@@ -462,6 +610,7 @@ class ClearedEngine:
 
         """
         if not reverse:
+            logger.debug(f"    Calling transform() on pipeline {pipeline.uid}")
             return pipeline.transform(
                 df=df,
                 deid_ref_dict=deid_ref_dict,
@@ -469,6 +618,9 @@ class ClearedEngine:
                 test_mode=test_mode,
             )
         else:
+            logger.debug(
+                f"    Calling reverse() on pipeline {pipeline.uid}, output_path={reverse_output_path}"
+            )
             return pipeline.reverse(
                 df=df,
                 deid_ref_dict=deid_ref_dict,
@@ -489,44 +641,69 @@ class ClearedEngine:
             Dictionary of initial de-identification reference DataFrames
 
         """
+        logger.debug("Loading initial de-identification reference dictionary")
         deid_ref_dict = {}
         if self.io_config.deid_ref.input_config is None:
+            logger.debug(
+                "No deid_ref input config provided, returning empty dictionary"
+            )
             return {}
 
         if self.io_config.deid_ref.input_config.io_type != "filesystem":
+            logger.debug(
+                f"Deid_ref input io_type is '{self.io_config.deid_ref.input_config.io_type}', not filesystem. Returning empty dictionary"
+            )
             return {}
 
         base_path = self.io_config.deid_ref.input_config.configs.get("base_path")
         if not base_path:
+            logger.debug(
+                "No base_path in deid_ref input config, returning empty dictionary"
+            )
             return {}
 
+        logger.debug(f"Loading deid_ref files from: {base_path}")
         if not os.path.exists(base_path):
+            logger.error(
+                f"De-identification reference input directory not found: {base_path}"
+            )
             raise FileNotFoundError(
                 f"De-identification reference input directory {base_path} not found"
             )
 
         csv_pattern = os.path.join(base_path, "*.csv")
         csv_files = glob.glob(csv_pattern)
+        logger.debug(
+            f"Found {len(csv_files)} CSV file(s) matching pattern: {csv_pattern}"
+        )
 
         for csv_file in csv_files:
             try:
                 # Get filename without extension as the key
                 filename = os.path.basename(csv_file)
                 key = os.path.splitext(filename)[0]  # Remove .csv extension
+                logger.debug(f"Loading deid_ref file: {filename} (key: {key})")
 
                 # Read CSV file
                 df = pd.read_csv(csv_file)
+                logger.debug(f"Loaded {len(df)} row(s) from {filename}")
 
                 # Convert numeric columns to appropriate types
                 df = self._convert_numeric_columns(df)
 
                 deid_ref_dict[key] = df
+                logger.info(
+                    f"  ✓ Loaded deid_ref: {key} ({len(df)} rows, {len(df.columns)} columns)"
+                )
 
             except Exception as e:
                 # Log error but continue with other files
-                print(f"Warning: Could not load CSV file {csv_file}: {e}")
+                logger.warning(
+                    f"Could not load CSV file {csv_file}: {e}", exc_info=True
+                )
                 continue
 
+        logger.info(f"Loaded {len(deid_ref_dict)} de-identification reference file(s)")
         return deid_ref_dict
 
     def _convert_numeric_columns(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -580,38 +757,55 @@ class ClearedEngine:
             ValueError: If the IO configuration is not properly configured
 
         """
+        logger.debug("Validating IO configuration...")
         if self.io_config is None:
+            logger.error("IO Config is None")
             raise ValueError("IO Config is required")
 
         if self.io_config.deid_ref is None:
+            logger.error("De-identification IO config is None")
             raise ValueError(
                 "De-identification IO config must contain at least outout io configurations"
             )
 
         if self.io_config.deid_ref.input_config is not None:
             if self.io_config.deid_ref.input_config.io_type != "filesystem":
+                logger.error(
+                    f"Deid_ref input io_type is '{self.io_config.deid_ref.input_config.io_type}', expected 'filesystem'"
+                )
                 raise ValueError(
                     "De-identification reference dictionary input configuration must be of type filesystem"
                 )
 
         if self.io_config.deid_ref.output_config is None:
+            logger.error(
+                "De-identification reference dictionary output configuration is None"
+            )
             raise ValueError(
                 "De-identification reference dictionary output configuration must be provided"
             )
 
         if self.io_config.deid_ref.output_config.io_type != "filesystem":
+            logger.error(
+                f"Deid_ref output io_type is '{self.io_config.deid_ref.output_config.io_type}', expected 'filesystem'"
+            )
             raise ValueError(
                 "De-identification reference dictionary output configuration must be of type filesystem"
             )
 
         if self.io_config.data is None:
+            logger.error("Data IO config is None")
             raise ValueError("Data IO config must be provided")
 
         if self.io_config.data.input_config is None:
+            logger.error("Data input configuration is None")
             raise ValueError("Data input configuration must be provided")
 
         if self.io_config.data.output_config is None:
+            logger.error("Data output configuration is None")
             raise ValueError("Data output configuration must be provided")
+
+        logger.debug("IO configuration validation passed")
 
     def _save_results(self, results: Results) -> None:
         """
@@ -621,6 +815,7 @@ class ClearedEngine:
             results: Results to save
 
         """
+        logger.debug("Preparing to save execution results")
         # Convert Results to dictionary for JSON serialization
         results_dict = {
             "success": results.success,
@@ -631,11 +826,18 @@ class ClearedEngine:
             },
         }
 
-        with open(
-            os.path.join(self.io_config.runtime_io_path, f"status_{self._uid}.json"),
-            "w",
-        ) as f:
+        output_file = os.path.join(
+            self.io_config.runtime_io_path, f"status_{self._uid}.json"
+        )
+        logger.debug(f"Saving results to: {output_file}")
+
+        # Ensure directory exists
+        os.makedirs(self.io_config.runtime_io_path, exist_ok=True)
+
+        with open(output_file, "w") as f:
             json.dump(results_dict, f, indent=2)
+
+        logger.info(f"  Results saved to: {output_file}")
 
     def _save_deid_ref_files(self, deid_ref_dict: dict[str, pd.DataFrame]) -> None:
         """
@@ -645,23 +847,39 @@ class ClearedEngine:
             deid_ref_dict: Dictionary of de-identification reference DataFrames
 
         """
+        logger.debug("Preparing to save de-identification reference files")
         if self.io_config.deid_ref.output_config is None:
+            logger.debug("No deid_ref output config, skipping save")
             return
 
         if self.io_config.deid_ref.output_config.io_type != "filesystem":
+            logger.debug(
+                f"Deid_ref output io_type is '{self.io_config.deid_ref.output_config.io_type}', not filesystem. Skipping save"
+            )
             return
 
         base_path = self.io_config.deid_ref.output_config.configs.get("base_path")
         if not base_path:
+            logger.debug("No base_path in deid_ref output config, skipping save")
             return
 
+        logger.debug(f"Saving deid_ref files to: {base_path}")
         # Create output directory if it doesn't exist
         os.makedirs(base_path, exist_ok=True)
+        logger.debug(f"Output directory created/verified: {base_path}")
 
         # Save each reference DataFrame as CSV
         for ref_name, ref_df in deid_ref_dict.items():
             output_file = os.path.join(base_path, f"{ref_name}.csv")
+            logger.debug(
+                f"Saving deid_ref '{ref_name}' ({len(ref_df)} rows) to: {output_file}"
+            )
             ref_df.to_csv(output_file, index=False)
+            logger.info(f"  ✓ Saved deid_ref file: {output_file}")
+
+        logger.info(
+            f"Saved {len(deid_ref_dict)} de-identification reference file(s) to {base_path}"
+        )
 
     def add_pipeline(self, pipeline: Pipeline) -> None:
         """
@@ -672,8 +890,11 @@ class ClearedEngine:
 
         """
         if pipeline is None:
+            logger.error("Attempted to add None pipeline")
             raise ValueError("Pipeline cannot be None")
+        logger.info(f"Adding pipeline: {pipeline.uid}")
         self._pipelines.append(pipeline)
+        logger.debug(f"Total pipelines: {len(self._pipelines)}")
 
     def remove_pipeline(self, pipeline_uid: str) -> bool:
         """
@@ -686,10 +907,14 @@ class ClearedEngine:
             True if pipeline was found and removed, False otherwise
 
         """
+        logger.debug(f"Attempting to remove pipeline: {pipeline_uid}")
         for i, pipeline in enumerate(self._pipelines):
             if pipeline.uid == pipeline_uid:
                 del self._pipelines[i]
+                logger.info(f"Removed pipeline: {pipeline_uid}")
+                logger.debug(f"Remaining pipelines: {len(self._pipelines)}")
                 return True
+        logger.warning(f"Pipeline not found for removal: {pipeline_uid}")
         return False
 
     def get_pipeline(self, pipeline_uid: str) -> Pipeline | None:
@@ -730,6 +955,7 @@ class ClearedEngine:
 
     def clear_results(self) -> None:
         """Clear stored results."""
+        logger.debug("Clearing stored results")
         self.results = {}
 
     def get_pipeline_count(self) -> int:

@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import pandas as pd
 import numpy as np
+import logging
 from cleared.transformers.base import FilterableTransformer
 from cleared.config.structure import IdentifierConfig, FilterConfig, DeIDConfig
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 
 class IDDeidentifier(FilterableTransformer):
@@ -51,6 +55,7 @@ class IDDeidentifier(FilterableTransformer):
             self.idconfig = idconfig
 
         if self.idconfig is None:
+            logger.error(f"Transformer {self.uid} idconfig is None")
             raise ValueError("idconfig is required for IDDeidentifier")
 
     def _get_column_to_cast(self) -> str | None:
@@ -119,7 +124,8 @@ class IDDeidentifier(FilterableTransformer):
         """Apply de-identification to the DataFrame."""
         # Validate input
         if self.idconfig.name not in df.columns:
-            raise ValueError(f"Column '{self.idconfig.name}' not found in DataFrame")
+            error_msg = f"Column '{self.idconfig.name}' not found in DataFrame"
+            raise ValueError(error_msg)
 
         # Get or create deid_ref_df for this transformer's deid  column's uid
 
@@ -129,19 +135,19 @@ class IDDeidentifier(FilterableTransformer):
             else deid_ref_dict.get(self.idconfig.uid)
         )
         if deid_ref_df is None:
-            raise ValueError(
-                f"De-identification reference not found for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
-            )
+            error_msg = f"De-identification reference not found for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
 
         if self.idconfig.deid_uid() not in deid_ref_df.columns:
-            raise ValueError(
-                f"Deid column '{self.idconfig.deid_uid()}' not found in deid_ref_df for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
-            )
+            error_msg = f"Deid column '{self.idconfig.deid_uid()}' not found in deid_ref_df for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
 
         if self.idconfig.uid not in deid_ref_df.columns:
-            raise ValueError(
-                f"UID column '{self.idconfig.uid}' not found in deid_ref_df for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
-            )
+            error_msg = f"UID column '{self.idconfig.uid}' not found in deid_ref_df for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
 
         # Inner join to ensure all values have mappings (raises error if some don't)
         merged = df.merge(
@@ -152,9 +158,11 @@ class IDDeidentifier(FilterableTransformer):
         )
 
         if merged.shape[0] != df.shape[0]:
-            raise ValueError(
+            error_msg = (
                 f"Some values in '{self.idconfig.name}' don't have deid mappings"
             )
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
 
         # Replace the column values with deidentified/original values
         merged[self.idconfig.name] = (
@@ -199,14 +207,14 @@ class IDDeidentifier(FilterableTransformer):
             ),
         )
         if self.idconfig.deid_uid() not in deid_ref_df.columns:
-            raise ValueError(
-                f"Deid column '{self.idconfig.deid_uid()}' not found in deid_ref_df for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
-            )
+            error_msg = f"Deid column '{self.idconfig.deid_uid()}' not found in deid_ref_df for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
 
         if self.idconfig.uid not in deid_ref_df.columns:
-            raise ValueError(
-                f"UID of the identifier column '{self.idconfig.uid}' not found in deid_ref_df for transformer {self.uid or 'unnamed'}"
-            )
+            error_msg = f"UID of the identifier column '{self.idconfig.uid}' not found in deid_ref_df for transformer {self.uid or 'unnamed'}"
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
 
         # Get unique values from the reference column
         unique_values = df[self.idconfig.name].dropna().unique()
@@ -232,6 +240,9 @@ class IDDeidentifier(FilterableTransformer):
                 new_values=list(missing_values), last_used_deid_uid=last_used_deid_uid
             )
             deid_ref_df = pd.concat([deid_ref_df, new_mappings], ignore_index=True)
+            logger.debug(
+                f"Transformer {self.uid} generated {len(missing_values)} new deid mappings for column '{self.idconfig.name}'"
+            )
 
         return deid_ref_df
 
