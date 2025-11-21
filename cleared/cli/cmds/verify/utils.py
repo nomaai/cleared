@@ -10,6 +10,7 @@ import typer
 from cleared.config.structure import ClearedConfig
 from cleared.io.filesystem import FileSystemDataLoader
 from cleared.cli.cmds.verify.model import VerificationResult
+from omegaconf import DictConfig
 
 
 def get_column_dropper_columns(config: ClearedConfig, table_name: str) -> set[str]:
@@ -51,8 +52,6 @@ def load_data_for_table(
                 "file_format": input_config.configs.get("file_format", "csv"),
             },
         }
-
-        from omegaconf import DictConfig
 
         loader = FileSystemDataLoader(DictConfig(loader_config))
         return loader.read_table(table_name)

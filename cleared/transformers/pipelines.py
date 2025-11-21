@@ -14,6 +14,7 @@ from pathlib import Path
 from .base import Pipeline, BaseTransformer
 from ..io import BaseDataLoader
 from ..config.structure import IOConfig, DeIDConfig, PairedIOConfig
+from ..models.verify_models import ColumnComparisonResult
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -232,6 +233,65 @@ class TablePipeline(Pipeline):
                 logger.info(f"    Wrote table '{self.table_name}' ({len(df)} rows)")
 
         return df, deid_ref_dict
+
+    def compare(
+        self,
+        original_data_path: Path,
+        reversed_data_path: Path,
+        deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+        rows_limit: int | None = None,
+    ) -> list[ColumnComparisonResult]:
+        """
+        Compare original and reversed table data.
+
+        Args:
+            original_data_path: Path to directory containing original data
+            reversed_data_path: Path to directory containing reversed data
+            deid_ref_dict: Dictionary of de-identification reference DataFrames (optional)
+            rows_limit: Optional limit on number of rows to read (for testing)
+
+        Returns:
+            List of ColumnComparisonResult objects, one per transformer
+
+        Raises:
+            ValueError: If tables cannot be read
+
+        """
+        if deid_ref_dict is None:
+            deid_ref_dict = {}
+
+        # Load original data
+        original_config = self.io_config.input_config
+        # Override base_path temporarily by creating a new IOConfig
+        original_loader_config = original_config.configs.copy()
+        original_loader_config["base_path"] = str(original_data_path)
+        temp_original_config = IOConfig(
+            io_type=original_config.io_type,
+            suffix=original_config.suffix,
+            configs=original_loader_config,
+        )
+        temp_original_loader = self._create_data_loader(temp_original_config)
+        original_df = temp_original_loader.read_table(
+            self.table_name, rows_limit=rows_limit
+        )
+
+        # Load reversed data
+        reversed_config = self.io_config.input_config
+        # Override base_path temporarily by creating a new IOConfig
+        reversed_loader_config = reversed_config.configs.copy()
+        reversed_loader_config["base_path"] = str(reversed_data_path)
+        temp_reversed_config = IOConfig(
+            io_type=reversed_config.io_type,
+            suffix=reversed_config.suffix,
+            configs=reversed_loader_config,
+        )
+        temp_reversed_loader = self._create_data_loader(temp_reversed_config)
+        reversed_df = temp_reversed_loader.read_table(
+            self.table_name, rows_limit=rows_limit
+        )
+
+        # Call parent Pipeline's compare method
+        return super().compare(original_df, reversed_df, deid_ref_dict)
 
     def _prepare_reverse_io_config(
         self,

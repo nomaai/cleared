@@ -30,6 +30,27 @@ class MockFilterableTransformer(FilterableTransformer):
             df["age"] = df["age"] / 2
         return df, deid_ref_dict
 
+    def _compare(
+        self,
+        original_df: pd.DataFrame,
+        reversed_df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame],
+    ) -> list:
+        """Mock _compare method that returns a pass result."""
+        from cleared.models.verify_models import ColumnComparisonResult
+
+        return [
+            ColumnComparisonResult(
+                column_name="age",
+                status="pass",
+                message="Mock filterable transformer comparison passed",
+                original_length=len(original_df),
+                reversed_length=len(reversed_df),
+                mismatch_count=0,
+                mismatch_percentage=0.0,
+            )
+        ]
+
 
 class TestFilterableTransformerBasic:
     """Test basic functionality of FilterableTransformer."""

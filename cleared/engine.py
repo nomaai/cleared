@@ -447,6 +447,129 @@ class ClearedEngine:
         self._log_execution_summary(results)
         return results
 
+    def verify(
+        self,
+        original_data_path: Path,
+        reversed_data_path: Path,
+        rows_limit: int | None = None,
+    ) -> dict[str, Any]:
+        """
+        Verify reversed data against original data by comparing using transformers.
+
+        This method loads original and reversed data for each table and uses
+        the transformers to compare them, ensuring the same filtering and casting
+        logic is applied as during transformation.
+
+        Args:
+            original_data_path: Path to directory containing original data
+            reversed_data_path: Path to directory containing reversed data
+            rows_limit: Optional limit on number of rows to read per table (for testing)
+
+        Returns:
+            Dictionary containing verification results for each table
+
+        Raises:
+            ValueError: If no pipelines are configured
+
+        """
+        logger.info(f"Starting verification (UID: {self._uid})")
+
+        if self._pipelines is None or len(self._pipelines) == 0:
+            logger.error("No pipelines configured")
+            raise ValueError("No pipelines configured. Add pipelines before verifying.")
+
+        logger.info(f"Verifying {len(self._pipelines)} pipeline(s)")
+
+        # Load de-identification reference dictionary (needed for comparison)
+        logger.debug("Loading de-identification reference dictionary")
+        deid_ref_dict = self._load_initial_deid_ref_dict()
+        logger.info(f"Loaded {len(deid_ref_dict)} de-identification reference file(s)")
+
+        # Verify each pipeline
+        from cleared.models.verify_models import ColumnComparisonResult
+
+        table_results: dict[str, list[ColumnComparisonResult]] = {}
+        for idx, table_pipeline in enumerate(self._pipelines):
+            logger.info(
+                f"  → Verifying pipeline {idx + 1}/{len(self._pipelines)}: {table_pipeline.uid}"
+            )
+            try:
+                result = table_pipeline.compare(
+                    original_data_path=Path(original_data_path),
+                    reversed_data_path=Path(reversed_data_path),
+                    deid_ref_dict=deid_ref_dict,
+                    rows_limit=rows_limit,
+                )
+                table_results[table_pipeline.uid] = result
+
+                # Log summary
+                passed_count = sum(1 for r in result if r.status == "pass")
+                error_count = sum(1 for r in result if r.status == "error")
+                warning_count = sum(1 for r in result if r.status == "warning")
+
+                if error_count == 0 and warning_count == 0:
+                    logger.info(
+                        f"  ✓ Pipeline {table_pipeline.uid} verification passed ({passed_count} transformer(s))"
+                    )
+                else:
+                    logger.warning(
+                        f"  ⚠ Pipeline {table_pipeline.uid} verification: {passed_count} passed, {error_count} errors, {warning_count} warnings"
+                    )
+            except Exception as e:
+                error_msg = f"Pipeline {table_pipeline.uid} verification failed: {e!s}"
+                logger.error(f"  ✗ {error_msg}")
+                table_results[table_pipeline.uid] = [
+                    ColumnComparisonResult(
+                        column_name="pipeline_error",
+                        status="error",
+                        message=error_msg,
+                        original_length=0,
+                        reversed_length=0,
+                        mismatch_count=0,
+                        mismatch_percentage=0.0,
+                    )
+                ]
+
+        # Calculate overall statistics
+        total_tables = len(table_results)
+        passed_tables = sum(
+            1
+            for results in table_results.values()
+            if all(r.status == "pass" for r in results)
+        )
+        failed_tables = sum(
+            1
+            for results in table_results.values()
+            if any(r.status == "error" for r in results)
+        )
+        warning_tables = sum(
+            1
+            for results in table_results.values()
+            if any(r.status == "warning" for r in results)
+            and not any(r.status == "error" for r in results)
+        )
+
+        overall_status = (
+            "pass"
+            if failed_tables == 0 and warning_tables == 0
+            else "error"
+            if failed_tables > 0
+            else "warning"
+        )
+
+        logger.info(
+            f"Verification completed: {total_tables} total, {passed_tables} passed, {failed_tables} failed, {warning_tables} warnings, overall_status={overall_status}"
+        )
+
+        return {
+            "overall_status": overall_status,
+            "total_tables": total_tables,
+            "passed_tables": passed_tables,
+            "failed_tables": failed_tables,
+            "warning_tables": warning_tables,
+            "table_results": table_results,
+        }
+
     def _run_table_pipeline(
         self,
         table_pipeline: TablePipeline,
@@ -664,12 +787,10 @@ class ClearedEngine:
 
         logger.debug(f"Loading deid_ref files from: {base_path}")
         if not os.path.exists(base_path):
-            logger.error(
-                f"De-identification reference input directory not found: {base_path}"
+            logger.debug(
+                f"De-identification reference input directory does not exist: {base_path}. Returning empty dictionary."
             )
-            raise FileNotFoundError(
-                f"De-identification reference input directory {base_path} not found"
-            )
+            return {}
 
         csv_pattern = os.path.join(base_path, "*.csv")
         csv_files = glob.glob(csv_pattern)

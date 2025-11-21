@@ -885,11 +885,9 @@ class TestClearedEngineDataLoading:
 
     def test_load_initial_deid_ref_dict_directory_not_exists(self):
         """Test _load_initial_deid_ref_dict with non-existent directory."""
-        with pytest.raises(
-            FileNotFoundError,
-            match=r"De-identification reference input directory .* not found",
-        ):
-            self.engine._load_initial_deid_ref_dict()
+        # The method now returns an empty dict instead of raising an error
+        result = self.engine._load_initial_deid_ref_dict()
+        assert result == {}
 
     @patch("cleared.engine.glob.glob")
     @patch("cleared.engine.pd.read_csv")
