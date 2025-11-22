@@ -788,7 +788,7 @@ class ClearedEngine:
         logger.debug(f"Loading deid_ref files from: {base_path}")
         if not os.path.exists(base_path):
             logger.debug(
-                f"De-identification reference input directory does not exist: {base_path}. Returning empty dictionary."
+                f"De-identification reference input directory not found: {base_path}. Returning empty dictionary"
             )
             return {}
 

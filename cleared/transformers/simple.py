@@ -11,6 +11,9 @@ from cleared.models.verify_models import ColumnComparisonResult
 # Set up logger for this module
 logger = logging.getLogger(__name__)
 
+# Set up logger for this module
+logger = logging.getLogger(__name__)
+
 
 class ColumnDropper(BaseTransformer):
     """Transformer to drop a column from a DataFrame."""
