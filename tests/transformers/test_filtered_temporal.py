@@ -312,7 +312,7 @@ class TestFilteredDateTimeDeidentifier:
             filter_config=filter_config,
         )
 
-        with pytest.raises(ValueError, match="Invalid filter condition"):
+        with pytest.raises(RuntimeError, match="Invalid filter condition"):
             transformer.transform(self.test_df, self.test_deid_ref_dict)
 
     def test_transform_with_empty_filtered_result(self):

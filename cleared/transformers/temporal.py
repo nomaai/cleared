@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import pandas as pd
 import numpy as np
+import logging
 from abc import ABC, abstractmethod
 from cleared.transformers.base import FilterableTransformer
 from cleared.config.structure import (
@@ -17,6 +18,9 @@ from cleared.config.structure import (
     TimeShiftConfig,
     FilterConfig,
 )
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 
 class DateTimeDeidentifier(FilterableTransformer):
@@ -76,29 +80,29 @@ class DateTimeDeidentifier(FilterableTransformer):
         self.datetime_column = datetime_column
 
         if self.idconfig is None:
+            logger.error(f"Transformer {self.uid} idconfig is None")
             raise ValueError("idconfig is required for DateTimeDeidentifier")
 
         # Use global_deid_config from parent (set by engine)
         # deid_config parameter is kept for backward compatibility but ignored
         if self.global_deid_config is None:
-            raise ValueError(
-                "global_deid_config is required for DateTimeDeidentifier. "
-                "Ensure the engine passes global_deid_config when instantiating transformers."
-            )
+            error_msg = "global_deid_config is required for DateTimeDeidentifier. Ensure the engine passes global_deid_config when instantiating transformers."
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
 
         if self.global_deid_config.time_shift is None:
-            raise ValueError(
-                "time_shift configuration is required in global deid_config for DateTimeDeidentifier"
-            )
+            error_msg = "time_shift configuration is required in global deid_config for DateTimeDeidentifier"
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
 
         # Validate that the time shift method is supported
         if (
             self.global_deid_config.time_shift.method
             not in _create_time_shift_gen_map().keys()
         ):
-            raise ValueError(
-                f"Unsupported time shift method: {self.global_deid_config.time_shift.method}"
-            )
+            error_msg = f"Unsupported time shift method: {self.global_deid_config.time_shift.method}"
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
 
         self.time_shift_generator = create_time_shift_generator(
             self.global_deid_config.time_shift
@@ -237,11 +241,15 @@ class DateTimeDeidentifier(FilterableTransformer):
 
         """
         if self.idconfig.name not in df.columns:
-            raise ValueError(
+            error_msg = (
                 f"Reference column '{self.idconfig.name}' not found in DataFrame"
             )
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
         if self.datetime_column not in df.columns:
-            raise ValueError(f"Column '{self.datetime_column}' not found in DataFrame")
+            error_msg = f"Column '{self.datetime_column}' not found in DataFrame"
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
 
     def _get_timeshift_reference(
         self,
@@ -270,28 +278,28 @@ class DateTimeDeidentifier(FilterableTransformer):
             # In reverse mode, timeshift_df must already exist
             timeshift_df = deid_ref_dict.get(self._timeshift_key())
             if timeshift_df is None:
-                raise ValueError(
-                    f"Time shift reference not found for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
-                )
+                error_msg = f"Time shift reference not found for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
+                logger.error(f"Transformer {self.uid} {error_msg}")
+                raise ValueError(error_msg)
 
             if self.idconfig.uid not in timeshift_df.columns:
-                raise ValueError(
-                    f"UID column '{self.idconfig.uid}' not found in timeshift_df for transformer {self.uid or 'unnamed'}"
-                )
+                error_msg = f"UID column '{self.idconfig.uid}' not found in timeshift_df for transformer {self.uid or 'unnamed'}"
+                logger.error(f"Transformer {self.uid} {error_msg}")
+                raise ValueError(error_msg)
 
             if self._timeshift_key() not in timeshift_df.columns:
-                raise ValueError(
-                    f"Shift column '{self._timeshift_key()}' not found in timeshift_df for transformer {self.uid or 'unnamed'}"
-                )
+                error_msg = f"Shift column '{self._timeshift_key()}' not found in timeshift_df for transformer {self.uid or 'unnamed'}"
+                logger.error(f"Transformer {self.uid} {error_msg}")
+                raise ValueError(error_msg)
         else:
             # In forward mode, create/update timeshift mappings
             timeshift_df = self._get_and_update_timeshift_mappings(df, deid_ref_dict)
 
             # Validate that reference column has no nulls (only in forward mode)
             if df[self.idconfig.name].isna().any():
-                raise ValueError(
-                    f"Reference column '{self.idconfig.name}' has null values. Time shift cannot be applied. Please ensure all reference values are non-null."
-                )
+                error_msg = f"Reference column '{self.idconfig.name}' has null values. Time shift cannot be applied. Please ensure all reference values are non-null."
+                logger.error(f"Transformer {self.uid} {error_msg}")
+                raise ValueError(error_msg)
 
         return timeshift_df
 
@@ -333,10 +341,9 @@ class DateTimeDeidentifier(FilterableTransformer):
         """
         if merged_df.shape[0] != original_df.shape[0]:
             operation = "reverse" if reverse else "processing"
-            raise ValueError(
-                f"Time shift {operation} failed: original length {original_df.shape[0]}, "
-                f"processed length {merged_df.shape[0]}. Some reference values don't have shift mappings."
-            )
+            error_msg = f"Time shift {operation} failed: original length {original_df.shape[0]}, processed length {merged_df.shape[0]}. Some reference values don't have shift mappings."
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
 
     def _apply_timeshift_to_column(
         self, merged_df: pd.DataFrame, reverse: bool
@@ -417,6 +424,9 @@ class DateTimeDeidentifier(FilterableTransformer):
                 }
             )
             timeshift_df = pd.concat([timeshift_df, new_mappings], ignore_index=True)
+            logger.debug(
+                f"Transformer {self.uid} generated {len(missing_values)} new time shift mappings for column '{self.datetime_column}'"
+            )
 
         return timeshift_df
 
@@ -586,6 +596,8 @@ def create_time_shift_generator(config: TimeShiftConfig) -> TimeShiftGenerator:
     """
     generator_map = _create_time_shift_gen_map()
     if config.method not in generator_map:
-        raise ValueError(f"Unsupported time shift method: {config.method}")
+        error_msg = f"Unsupported time shift method: {config.method}"
+        logger.error(f"Time shift generator {error_msg}")
+        raise ValueError(error_msg)
 
     return generator_map[config.method](config.min, config.max)

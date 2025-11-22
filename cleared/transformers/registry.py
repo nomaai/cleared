@@ -2,9 +2,16 @@
 
 from __future__ import annotations
 
+import inspect
+import importlib
+import os
+import logging
 from omegaconf import DictConfig
 from .base import BaseTransformer
-from cleared.config.structure import DeIDConfig
+from cleared.config.structure import DeIDConfig, IdentifierConfig
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 
 def get_expected_transformer_names() -> list[str]:
@@ -18,10 +25,6 @@ def get_expected_transformer_names() -> list[str]:
         List of transformer class names that should be auto-discovered
 
     """
-    import inspect
-    import importlib
-    import os
-
     transformer_names = []
 
     try:
@@ -100,10 +103,6 @@ class TransformerRegistry:
 
     def _register_default_transformers(self) -> None:
         """Register all non-abstract classes that extend BaseTransformer from the transformers package."""
-        import inspect
-        import importlib
-        import os
-
         try:
             # Get the current package directory
             current_dir = os.path.dirname(__file__)
@@ -134,11 +133,11 @@ class TransformerRegistry:
 
                     except ImportError as e:
                         # Handle case where some modules might not be available
-                        print(f"Warning: Could not import module {module_name}: {e}")
+                        logger.warning(f"Could not import module {module_name}: {e}")
 
         except Exception as e:
             # Handle any other errors during auto-discovery
-            print(f"Warning: Error during transformer auto-discovery: {e}")
+            logger.warning(f"Error during transformer auto-discovery: {e}")
 
     def register(self, name: str, transformer_class: type[BaseTransformer]) -> None:
         """
@@ -154,15 +153,17 @@ class TransformerRegistry:
 
         """
         if not issubclass(transformer_class, BaseTransformer):
-            raise TypeError(
-                f"transformer_class must be a subclass of BaseTransformer, "
-                f"got {type(transformer_class)}"
-            )
+            error_msg = f"transformer_class must be a subclass of BaseTransformer, got {type(transformer_class)}"
+            logger.error(f"Registry {error_msg}")
+            raise TypeError(error_msg)
 
         if name in self._registry:
-            raise ValueError(f"Transformer '{name}' is already registered")
+            error_msg = f"Transformer '{name}' is already registered"
+            logger.error(f"Registry {error_msg}")
+            raise ValueError(error_msg)
 
         self._registry[name] = transformer_class
+        logger.debug(f"Registry registered transformer: {name}")
 
     def unregister(self, name: str) -> None:
         """
@@ -176,14 +177,18 @@ class TransformerRegistry:
 
         """
         if name not in self._registry:
-            raise KeyError(f"Transformer '{name}' is not registered")
+            error_msg = f"Transformer '{name}' is not registered"
+            logger.error(f"Registry {error_msg}")
+            raise KeyError(error_msg)
 
         del self._registry[name]
+        logger.debug(f"Registry unregistered transformer: {name}")
 
     def instantiate(
         self,
         name: str,
         configs: DictConfig,
+        uid: str | None = None,
         global_deid_config: DeIDConfig | None = None,
     ) -> BaseTransformer:
         """
@@ -192,6 +197,7 @@ class TransformerRegistry:
         Args:
             name: Name of the transformer to instantiate
             configs: Hydra DictConfig object containing transformer configuration
+            uid: Unique identifier for the transformer
             global_deid_config: Global de-identification configuration to pass to transformers
 
         Returns:
@@ -210,26 +216,33 @@ class TransformerRegistry:
         """
         if name not in self._registry:
             available_transformers = list(self._registry.keys())
-            raise KeyError(
-                f"Unknown transformer '{name}'. "
-                f"Available transformers: {available_transformers}"
-            )
+            error_msg = f"Unknown transformer '{name}'. Available transformers: {available_transformers}"
+            logger.error(f"Registry {error_msg}")
+            raise KeyError(error_msg)
 
         transformer_class = self._registry[name]
 
         try:
+            # Get the transformer's __init__ signature to see what parameters it accepts
+            sig = inspect.signature(transformer_class.__init__)
+            accepted_params = set(sig.parameters.keys()) - {"self"}  # Exclude 'self'
+
+            # Check if the transformer accepts **kwargs (var_keyword parameter)
+            accepts_kwargs = any(
+                param.kind == inspect.Parameter.VAR_KEYWORD
+                for param in sig.parameters.values()
+            )
+
             # Convert DictConfig to dict for transformer constructors
             if hasattr(configs, "_content"):
                 # It's a DictConfig, convert to dict
-                config_dict = dict(configs)
+                config_dict = dict(configs) if configs is not None else {}
             else:
-                # It's already a dict
-                config_dict = configs
+                # It's already a dict or None
+                config_dict = configs if configs is not None else {}
 
             # Special handling for transformers that expect IdentifierConfig objects
-            if config_dict is not None and "idconfig" in config_dict:
-                from cleared.config.structure import IdentifierConfig
-
+            if "idconfig" in config_dict:
                 # Handle both dict and DictConfig cases
                 if isinstance(config_dict["idconfig"], dict):
                     config_dict["idconfig"] = IdentifierConfig(
@@ -241,27 +254,57 @@ class TransformerRegistry:
                         **dict(config_dict["idconfig"])
                     )
 
-            # Remove deid_config from config_dict if present (we use global_deid_config instead)
-            # This allows backward compatibility but prevents per-transformer deid_config
-            if config_dict is not None and "deid_config" in config_dict:
-                # Remove it - we'll use global_deid_config instead
-                del config_dict["deid_config"]
+            # Check for unexpected parameters in config_dict (excluding special ones we handle)
+            # Only check if transformer doesn't accept **kwargs
+            if not accepts_kwargs:
+                special_params = {"uid", "deid_config"}
+                unexpected_params = [
+                    key
+                    for key in config_dict.keys()
+                    if key not in special_params and key not in accepted_params
+                ]
+                if unexpected_params:
+                    # Match Python's error message format for unexpected keyword arguments
+                    if len(unexpected_params) == 1:
+                        raise TypeError(
+                            f"{transformer_class.__name__}.__init__() got an unexpected keyword argument '{unexpected_params[0]}'"
+                        )
+                    else:
+                        param_str = ", ".join(f"'{p}'" for p in unexpected_params)
+                        raise TypeError(
+                            f"{transformer_class.__name__}.__init__() got unexpected keyword arguments: {param_str}"
+                        )
 
-            # Add global_deid_config to config_dict if provided
-            if global_deid_config is not None:
-                if config_dict is None:
-                    config_dict = {}
-                config_dict["global_deid_config"] = global_deid_config
+            # Build the argument dictionary based on what the transformer accepts
+            init_kwargs = {}
 
-            # Handle None config case
-            if config_dict is None:
-                return transformer_class(global_deid_config=global_deid_config)
-            else:
-                return transformer_class(**config_dict)
+            # Add uid if transformer accepts it and uid is provided
+            if "uid" in accepted_params and uid is not None:
+                init_kwargs["uid"] = uid
+
+            # Add global_deid_config if transformer accepts it and it's provided
+            if (
+                "global_deid_config" in accepted_params
+                and global_deid_config is not None
+            ):
+                init_kwargs["global_deid_config"] = global_deid_config
+
+            # Add all other config parameters
+            # If transformer accepts **kwargs, include all params (except special ones)
+            # Otherwise, only include params that are explicitly accepted
+            special_params = {"uid", "deid_config"}
+            for key, value in config_dict.items():
+                if key not in special_params:
+                    if accepts_kwargs or key in accepted_params:
+                        init_kwargs[key] = value
+
+            # Instantiate the transformer with the built arguments
+            return transformer_class(**init_kwargs)
+
         except Exception as e:
-            raise TypeError(
-                f"Failed to create transformer '{name}' with configs: {e}"
-            ) from e
+            error_msg = f"Failed to create transformer '{name}' with configs: {e}"
+            logger.error(f"Registry {error_msg}")
+            raise TypeError(error_msg) from e
 
     def get_class(self, name: str) -> type[BaseTransformer]:
         """
@@ -279,10 +322,9 @@ class TransformerRegistry:
         """
         if name not in self._registry:
             available_transformers = list(self._registry.keys())
-            raise KeyError(
-                f"Unknown transformer '{name}'. "
-                f"Available transformers: {available_transformers}"
-            )
+            error_msg = f"Unknown transformer '{name}'. Available transformers: {available_transformers}"
+            logger.error(f"Registry {error_msg}")
+            raise KeyError(error_msg)
 
         return self._registry[name]
 

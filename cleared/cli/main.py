@@ -1,9 +1,16 @@
 """Main CLI application for Cleared data de-identification framework."""
 
 import typer
+import logging
 
-# Import all command modules
-from cleared.cli.cmds import (
+# Set up colored logging before importing commands
+from cleared.logging_config import setup_logging
+
+# Initialize logging with colors
+setup_logging(level=logging.INFO, use_colors=True)
+
+# Import all command modules (must be after setup_logging)
+from cleared.cli.cmds import (  # noqa: E402
     check_syntax,
     verify,
     describe,

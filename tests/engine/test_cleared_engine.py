@@ -549,7 +549,10 @@ class TestClearedEngineInitFromConfig:
 
         # Verify TablePipeline was created correctly
         mock_pipeline_class.assert_called_once_with(
-            "patients", self.valid_io_config.data, self.valid_deid_config
+            "patients",
+            self.valid_io_config.data,
+            self.valid_deid_config,
+            uid="patients",
         )
 
         # Verify transformer was instantiated and added
@@ -562,6 +565,7 @@ class TestClearedEngineInitFromConfig:
                     "description": "Patient ID",
                 }
             },
+            uid="patient_id_transformer",
             global_deid_config=self.valid_deid_config,
         )
         mock_pipeline_instance.add_transformer.assert_called_once_with(mock_transformer)

@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import pandas as pd
+import logging
 from cleared.transformers.base import BaseTransformer
 from cleared.config.structure import IdentifierConfig, DeIDConfig
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 
 class ColumnDropper(BaseTransformer):
@@ -42,6 +46,7 @@ class ColumnDropper(BaseTransformer):
             self.idconfig = idconfig
 
         if self.idconfig is None:
+            logger.error(f"Transformer {self.uid} idconfig is None")
             raise ValueError("idconfig is required for ColumnDropper")
 
     def transform(
@@ -63,9 +68,12 @@ class ColumnDropper(BaseTransformer):
         """
         # Validate input
         if self.idconfig.name not in df.columns:
-            raise ValueError(f"Column '{self.idconfig.name}' not found in DataFrame")
+            error_msg = f"Column '{self.idconfig.name}' not found in DataFrame"
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
 
         # Create a copy of the DataFrame and drop the specified column
+        logger.debug(f"Transformer {self.uid} dropping column '{self.idconfig.name}'")
         result_df = df.drop(columns=[self.idconfig.name])
 
         # Return the transformed DataFrame and unchanged deid_ref_dict

@@ -4,10 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+import logging
 
 import typer
 
 from cleared.engine import ClearedEngine
+from cleared.logging_config import setup_logging
 from cleared.cli.utils import (
     load_config_from_file,
     validate_paths,
@@ -113,6 +115,10 @@ def _run_engine_internal(
         reverse_output_path: Directory path for reverse mode output (required if reverse=True)
 
     """
+    # Set up logging level based on verbose flag
+    log_level = logging.DEBUG if verbose else logging.INFO
+    setup_logging(level=log_level, use_colors=True)
+
     try:
         setup_hydra_config_store()
 
@@ -237,7 +243,29 @@ def _display_results(results: Any, verbose: bool = False) -> None:
 
 def _print_error(error: Exception, verbose: bool) -> None:
     """Print error message."""
-    typer.echo(f"Error: {error}", err=True)
-    import traceback
+    from cleared.transformers.base import FormattedDataFrameError
 
-    typer.echo(traceback.format_exc(), err=True)
+    error_str = str(error)
+    is_formatted_error = isinstance(error, FormattedDataFrameError)
+
+    if is_formatted_error:
+        # For formatted errors, just print the message without "Error:" prefix or traceback
+        typer.echo(error_str)
+    else:
+        # Check if it's a DataFrame-related error (not using custom exception)
+        error_lower = error_str.lower()
+        is_dataframe_error = any(
+            keyword in error_lower
+            for keyword in ["missing column", "not found", "dataframe"]
+        )
+
+        if is_dataframe_error:
+            # For DataFrame errors, print without "Error:" prefix
+            typer.echo(error_str)
+        else:
+            # For other errors, show full error with traceback
+            typer.echo(f"Error: {error}", err=True)
+            if verbose:
+                import traceback
+
+                typer.echo(traceback.format_exc(), err=True)
