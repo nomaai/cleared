@@ -71,7 +71,7 @@ class TestFilterableTransformerBasic:
         transformer = MockFilterableTransformer(filter_config=filter_config)
         df = pd.DataFrame({"age": [20, 30, 40], "name": ["A", "B", "C"]})
 
-        with pytest.raises(ValueError, match="Invalid filter condition"):
+        with pytest.raises(RuntimeError, match="Invalid filter condition"):
             transformer.apply_filters(df)
 
     def test_undo_filters_no_filter(self):

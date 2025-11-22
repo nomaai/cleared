@@ -265,7 +265,7 @@ class FilterableTransformer(BaseTransformer):
         except Exception as e:
             error_msg = f"Invalid filter condition '{self.filter_config.where_condition}': {e!s}"
             logger.error(f"Transformer {self.uid} filter failed: {error_msg}")
-            raise ValueError(error_msg) from e
+            raise RuntimeError(error_msg) from e
 
     def undo_filters(
         self, original_df: pd.DataFrame, transformed_df: pd.DataFrame
@@ -553,9 +553,13 @@ class Pipeline(BaseTransformer):
                     result_df, deid_ref_dict = transformer.reverse(
                         result_df, deid_ref_dict
                     )
-            except (ValueError, KeyError, AttributeError) as e:
-                # Check if it's a DataFrame-related error
+            except (ValueError, KeyError, AttributeError, RuntimeError) as e:
+                # Check if it's a filter condition error first (should be RuntimeError)
                 error_str = str(e).lower()
+                if "invalid filter condition" in error_str:
+                    # Filter errors should be RuntimeError - re-raise as-is
+                    raise
+                # Check if it's a DataFrame-related error
                 if any(
                     keyword in error_str
                     for keyword in ["column", "not found", "dataframe", "index", "key"]
@@ -630,9 +634,13 @@ class Pipeline(BaseTransformer):
                     df, deid_ref_dict = transformer.transform(df, deid_ref_dict)
                 else:
                     df, deid_ref_dict = transformer.reverse(df, deid_ref_dict)
-            except (ValueError, KeyError, AttributeError) as e:
-                # Check if it's a DataFrame-related error
+            except (ValueError, KeyError, AttributeError, RuntimeError) as e:
+                # Check if it's a filter condition error first (should be RuntimeError)
                 error_str = str(e).lower()
+                if "invalid filter condition" in error_str:
+                    # Filter errors should be RuntimeError - re-raise as-is
+                    raise
+                # Check if it's a DataFrame-related error
                 if any(
                     keyword in error_str
                     for keyword in ["column", "not found", "dataframe", "index", "key"]
