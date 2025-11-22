@@ -695,3 +695,7 @@ For additional help and support:
 - Check the [main documentation](../README.md)
 - Review the [contributing guide](contributing.md)
 - Open an issue on the [GitHub repository](https://github.com/nomaai/cleared)
+
+## Next Tutorial
+
+Continue to the next tutorial: [Linting Rules Reference](linting_rules.md) - Complete reference for all configuration linting rules

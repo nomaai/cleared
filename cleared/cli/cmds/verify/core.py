@@ -183,8 +183,9 @@ def verify_data(
             if col_result.status == "error":
                 table_status = "error"
                 errors.append(col_result.message)
-            elif col_result.status == "warning" and table_status != "error":
-                table_status = "warning"
+            elif col_result.status == "warning":
+                if table_status != "error":
+                    table_status = "warning"
                 warnings.append(col_result.message)
 
         passed_count = sum(1 for c in column_results if c.status == "pass")

@@ -1,137 +1,133 @@
-# Cleared
+# Cleared Documentation
 
 <div align="center">
-  <img src="logo.png" alt="Cleared Logo" width="200">
+  <img src="../img/logo.png" alt="Cleared Logo" width="200">
 </div>
 
 > Share data for scientific research confidently.
 
----
+Welcome to the Cleared documentation! This documentation will help you understand how to use Cleared to de-identify healthcare and research data while maintaining clinical integrity and research utility.
 
-## 🩺 Overview
+<div align="center">
+  <img src="../img/cleared-overview.png" alt="Cleared Overview System" width="100%">
+</div>
 
-**Cleared** is an opensource multi-purpose de-identification library with special support for the healthcare applications. It provides robust tools to de-identify **multi-table, multimodal** datasets while maintaining clinical integrity and research utility. Therefore, it provides support for wellknown healthcare usecases in addition to predefined controls and configurations for typical  compliance levels optimized for **HIPAA**, **GDPR**, and **Safe Harbor** standards. Examples include:
+## What is Cleared?
 
-- Support for multiple identifiers (SSN, Encounter Id, MRN, FIN, etc) in the same tables
+**Cleared** is an open-source multi-purpose de-identification library with special support for healthcare applications. It provides robust tools to de-identify **multi-table, multimodal** datasets while maintaining clinical integrity and research utility.
+
+Cleared supports:
+- Multiple identifiers (SSN, Encounter Id, MRN, FIN, etc.) in the same tables
 - Time-field de-identification
-- Patient-aware deidentification across multiple encounters (visits)
-- Date and time de-identification both at column-level and row value level.
-- Support for time-series data such as multi-variate sparsely sampled data types and high-frequencyt waveforms
-- Predefined configurations for standard schemas such as [OMOP CDM](https://www.ohdsi.org/data-standardization/).
+- Patient-aware de-identification across multiple encounters (visits)
+- Date and time de-identification at both column-level and row value level
+- Support for time-series data such as multi-variate sparsely sampled data types and high-frequency waveforms
+- Predefined configurations for standard schemas such as [OMOP CDM](https://www.ohdsi.org/data-standardization/)
 
----
+## Quick Navigation
 
-## 🔬 Healthcare Use Cases
+### 🚀 Getting Started
 
-| Use Case | Description |
-|-----------|-------------|
-| **EHR De-identification** | De-identify patient, encounter, and observation tables while preserving linkages |
-| **Clinical Research Prep** | Create HIPAA-compliant datasets for multicenter research or data sharing |
-| **Machine Learning Pipelines** | Prepare structured and text data for model training without PHI |
-| **Temporal Cohort Studies** | Shift and anonymize dates while preserving relative event order |
-| **FHIR/OMOP Data Conversion** | Ingest and export data to common healthcare models safely |
+New to Cleared? Start here:
 
----
-## 🧩 Features
+1. **[Quickstart](quickstart.md)** - Get started with the de-identification workflow
+2. **[Single Table Example](use_cleared_config.md)** - Learn de-identification with YAML configs and CLI
+3. **[Describe: Review De-identification Configuration](use_describe.md)** - Generate and review HTML configuration reports
 
-| Feature | Description |
-|----------|-------------|
-| ✅ **Multi-table Support** | Consistent ID mapping across EHR tables (e.g. patients, encounters, labs) |
-| ✅ **Multi-ID Support** | Consistent ID mapping across multiple identifiers |
-| ✅ **Data Risk Analysis and Reporting** | Analyzes datasets for possible identfier risk and providers comprehensive report to verify de-id plans and configurations|
-| ✅ **ID Grouping Support** | Supports de-identification of group-level identifiers such as Patient/Person ID or MRN that will be common across multiple unique patient visits or encounters|
-| ✅ **Date & Time Shifting** | De-identify temporal data while preserving clinical event intervals |
-| ✅ **Schema-aware Configs** | Built-in support for HL7, OMOP, and FHIR-like schemas |
-| ✅ **Concept ID Filtering** | Create deidentification rules in values based on concept_id filters |
-| ✅ **Conditional De-identification** |  Ability to only apply de-identification rules|
-| ✅ **Pseudonymization Engine** | Deterministic, reversible pseudonyms for longitudinal tracking |
-| ✅ **Reverse De-identification** | Restore original values from de-identified data using reference mappings |
-| ✅ **Verify De-identification** | Verify that reversed data matches original data with comprehensive comparison and HTML reporting |
-| ✅ **Custom Transformers PLugins** | Supports implementation of plugins for custom de-identification filters and methods  |
-| ✅ **Healthcare-Ready Defaults** | Includes mappings for demographics, identifiers, and care events |
-| ✅ **Configuration Reusability** | Leverages the well-known hydra configuration yaml file to facilitate reusability of existing configs, partial configuration imoporting, configuration inheritencfe and customizations |
+### 📖 Core Concepts
 
-## ⚖️ Compliance
+Learn the fundamental concepts:
 
-**Cleared** is designed to assist with developing de-identification pipelines to reach compliance under the following frameworks and standards:
+4. **[Multi-table De-identification](multi_table_pipeline_config.md)** - Handle related tables with consistent de-identification
+5. **[Rerun De-identification with Consistency](rerun_deidentification_consistency.md)** - Maintain consistency when adding new data
+6. **[Reversing De-identification](reverse.md)** - Restore original values from de-identified data
+7. **[Verify De-identification Results](verify-deid-results.md)** - Verify reversed data integrity and generate HTML reports
+8. **[UIDs de-identification](group-level-id-deidentification.md)** - De-identify group-level identifiers
+
+### 🛠️ Reference Guides
+
+Detailed reference documentation:
+
+9. **[CLI Usage Guide](cli-usage.md)** - Complete command-line interface reference
+10. **[Linting Rules Reference](linting_rules.md)** - Complete reference for all configuration linting rules
+11. **[Date and Time Shifting](date-and-time-shifting.md)** - Detailed guide on temporal de-identification
+12. **[Using the Python API](using_the_python_api.md)** - De-identification using Python API directly
+
+### 🔬 Advanced Topics
+
+Explore advanced features:
+
+13. **[Free-text PHI Detection](phi-detection.md)** - Detect PHI in free-text fields
+14. **[Logging and Auditing](logging-and-auditing.md)** - Configure logging and audit trails
+15. **[Healthcare Schema Support](healthcare-schema-support.md)** - Built-in support for healthcare schemas
+16. **[Custom Transformers Plugins](custom-transformers-plugins.md)** - Create custom de-identification transformers
+
+### 🤝 Contributing
+
+17. **[Contributing](contributing.md)** - How to contribute to Cleared
+
+## Learning Paths
+
+### For First-Time Users
+
+1. Start with the **[Quickstart](quickstart.md)** to understand the basic workflow
+2. Follow the **[Single Table Example](use_cleared_config.md)** to create your first configuration
+3. Use **[Describe: Review De-identification Configuration](use_describe.md)** to review your configuration
+4. Learn about **[Multi-table De-identification](multi_table_pipeline_config.md)** for complex scenarios
+
+### For Healthcare Data Engineers
+
+1. Review **[Healthcare Schema Support](healthcare-schema-support.md)** for schema-specific guidance
+2. Understand **[Date and Time Shifting](date-and-time-shifting.md)** for temporal data
+3. Explore **[UIDs de-identification](group-level-id-deidentification.md)** for patient-level identifiers
+4. Check **[CLI Usage Guide](cli-usage.md)** for production workflows
+
+### For Python Developers
+
+1. Start with **[Using the Python API](using_the_python_api.md)** for programmatic usage
+2. Review **[Custom Transformers Plugins](custom-transformers-plugins.md)** to extend functionality
+3. Explore the API reference for detailed transformer documentation
+
+## Key Features
+
+Cleared provides comprehensive de-identification capabilities:
+
+- ✅ **Multi-table Support** - Consistent ID mapping across EHR tables
+- ✅ **Multi-ID Support** - Handle multiple identifiers in the same tables
+- ✅ **Date & Time Shifting** - Preserve clinical event intervals
+- ✅ **Schema-aware Configs** - Built-in support for HL7, OMOP, and FHIR-like schemas
+- ✅ **Pseudonymization Engine** - Deterministic, reversible pseudonyms
+- ✅ **Reverse De-identification** - Restore original values using reference mappings
+- ✅ **Verify De-identification** - Comprehensive verification with HTML reports
+- ✅ **Configuration Reusability** - Leverage Hydra configuration system
+
+## Compliance Support
+
+Cleared is designed to assist with developing de-identification pipelines to reach compliance under:
 
 - **HIPAA** (Safe Harbor & Expert Determination)
 - **GDPR** (Anonymization & Pseudonymization)
 - **21 CFR Part 11** (Audit Trails)
 
-> ⚠️ **Note:** Cleared is a toolkit — not a certification engine.  
-> Regulatory compliance remains **user-dependent** and must be validated within your organization’s governance and compliance framework.
+> ⚠️ **Important:** Cleared is a toolkit — not a certification engine. Regulatory compliance remains **user-dependent** and must be validated within your organization's governance and compliance framework.
 
+## Installation
 
+Install Cleared using pip:
 
-## 📚 Getting Started
+```bash
+pip install cleared
+```
 
-1. [Quickstart](docs/quickstart.md) - Get started with single table de-identification
-2. [Using Configuration Files](docs/use_cleared_config.md) - De-identification with YAML configs and CLI
-3. [Multi-table De-identification](docs/multi_table_pipeline_config.md) - Handle related tables with consistent de-identification
-4. [Rerun De-identification with Consistency](docs/rerun_deidentification_consistency.md) - Maintain consistency when adding new data
-5. [Reversing De-identification](docs/reverse.md) - Restore original values from de-identified data
-6. [Verify and Report](docs/verify-and-report.md) - Verify reversed data integrity and generate HTML reports
-7. [UIDs de-identification](docs/group-level-id-deidentification.md)
-8. [CLI Usage Guide](docs/cli-usage.md)
-9. [Linting Rules Reference](docs/linting_rules.md) - Complete reference for all configuration linting rules
-10. [Date and Time Shifting](docs/date-and-time-shifting.md)
-11. [Free-text PHI Detection](docs/phi-detection.md)
-12. [Logging and Auditing](docs/logging-and-auditing.md)
-13. [Healthcare Schema Support](docs/healthcare-schema-support.md)
-14. [Custom Transformers Plugins](docs/custom-transformers-plugins.md)
-15. [Contributing](docs/contributing.md)
+For development installation, see the [Contributing](contributing.md) guide.
 
-## 🛣 Roadmap
+## Need Help?
 
-| Milestone                                    | Status       |
-|---------------------------------------------|--------------|
-| Multi-table, Multi-id de-ID                  | ✅ Completed |
-| Concept based filtering                      | ✅ Completed |
-| Standard PHI type detectors                  | ✅ Completed |
-| OMOP  schema defaults                        | ✅ Completed |
-| Date/time & age shifting                     | ✅ Completed |
-| LLM PHI scanner                              | ⏳ Planned   |
-| Audit Logs                                   | ⏳ Planned   |
-| Synthetic patient generator                  | ⏳ Planned   |
-| Integration with MIMIC-IV & PhysioNet        | ⏳ Planned   |
-| Support for waveform & image metadata        | ⏳ Planned   |
-| Cloud-native deployment (GCP/AWS)            | ⏳ Planned   |
+- 📖 Browse the tutorials above to learn step-by-step
+- 🔍 Check the [CLI Usage Guide](cli-usage.md) for command reference
+- 📋 Review [Linting Rules Reference](linting_rules.md) for configuration validation
+- 💬 Open an issue on [GitHub](https://github.com/nomaai/cleared/issues) for questions
 
 ---
 
-## 🤝 Contributing
-
-We welcome contributions from healthcare AI developers, informaticians, and data engineers.
-
-Please see [`CONTRIBUTING.md`](CONTRIBUTING.md) for contribution guidelines.
-
-Areas you can help with:
-- ⏳ Contribute to the planned features
-- 🧩 Writing new transformers
-- ⛁ Implementing storage type support for Postgres/MySQL/Iceberg/etc.
-- 🧰 Adding new schema built-in supports for EPIC/Cerner/etc.
-- 🤖 Integrating model-based PHI detectors
-- 🧪 Improving testing infrastructure and synthetic data coverage
-
----
-
-## 📜 License and Disclaimer
-
-This project is licensed under the [Apache 2.0 License](https://www.apache.org/licenses/LICENSE-2.0).
-
-> ⚠️ Disclaimer: This library is provided "as is" without warranty of any kind. It is not a certified compliance tool. You are responsible for validating its use in regulated or clinical environments. 
-
-**Read detailed disclaimers [here](disclaime.md)**
-
-
-
----
-
-## 🌐 Links
-
-- [📖 Documentation](https://cleared.readthedocs.io)
-- [📦 PyPI Package](https://pypi.org/project/cleared)
-- [📊 Demo Notebooks](https://github.com/nomaai/cleared/examples)
-- [💬 Issues & Discussions](https://github.com/YOURORG/cleared/issues)
-
+**Ready to get started?** Begin with the [Quickstart Guide](quickstart.md)!

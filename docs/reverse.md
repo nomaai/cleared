@@ -98,3 +98,6 @@ result = engine.run(
 - **Data Updates**: Apply updates to original data and re-run de-identification
 - **Audit Trails**: Maintain ability to trace back to original data when needed
 
+## Next Tutorial
+
+Continue to the next tutorial: [Verify De-identification Results](verify-deid-results.md) - Verify reversed data integrity and generate HTML reports

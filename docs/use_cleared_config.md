@@ -278,8 +278,6 @@ The results should be identical to the quickstart example:
 
 
 
-## Next Steps
+## Next Tutorial
 
-- Learn about [multi-table pipelines](multi_table_pipeline_config.md) for related data
-- Check out the [CLI usage guide](cli-usage.md) for advanced command-line options
-- Explore [advanced configuration options](advanced_config.md) for complex workflows
+Continue to the next tutorial: [Review De-identification Configuration](use_describe.md) - Generate and review HTML configuration reports
