@@ -27,11 +27,6 @@ on:
         type: boolean
         default: true
 
-  # Also trigger on version tags (v*.*.*) for publishing only
-  push:
-    tags:
-      - 'v*.*.*'
-
 # Environment variables
 env:
   PYTHON_VERSION: '3.11'
@@ -42,8 +37,8 @@ jobs:
     name: "Prepare Release"
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.version_bump.outputs.new_version || steps.version_tag.outputs.new_version }}
-      version_tag: ${{ steps.version_bump.outputs.version_tag || steps.version_tag.outputs.version_tag }}
+      version: ${{ steps.version_bump.outputs.new_version }}
+      version_tag: ${{ steps.version_bump.outputs.version_tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -103,16 +98,6 @@ jobs:
           echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
           echo "New version: ${NEW_VERSION}"
           echo "Version tag: ${VERSION_TAG}"
-
-      - name: Get version from tag (if triggered by tag)
-        id: version_tag
-        if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          VERSION_TAG="${GITHUB_REF#refs/tags/}"
-          NEW_VERSION="${VERSION_TAG#v}"
-          echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
-          echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
-          echo "Version from tag: ${NEW_VERSION}"
 
       - name: Run full CI checks
         if: github.event_name == 'workflow_dispatch'
@@ -175,9 +160,7 @@ jobs:
     name: "Create GitHub Release"
     needs: prepare-release
     runs-on: ubuntu-latest
-    if: |
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true') ||
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'
     permissions:
       contents: write
     steps:
@@ -242,9 +225,7 @@ jobs:
     name: "Publish to PyPI"
     needs: prepare-release
     runs-on: ubuntu-latest
-    if: |
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_to_pypi == 'true') ||
-      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_to_pypi == 'true'
     environment:
       name: pypi
       url: https://pypi.org/p/cleared

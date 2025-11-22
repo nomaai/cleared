@@ -65,6 +65,7 @@ Explore advanced features:
 ### 🤝 Contributing
 
 17. **[Contributing](contributing.md)** - How to contribute to Cleared
+18. **[Release Process](release.md)** - Guide for creating and publishing releases
 
 ## Learning Paths
 
