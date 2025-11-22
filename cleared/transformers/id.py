@@ -7,6 +7,10 @@ import numpy as np
 import logging
 from cleared.transformers.base import FilterableTransformer
 from cleared.config.structure import IdentifierConfig, FilterConfig, DeIDConfig
+from cleared.models.verify_models import ColumnComparisonResult
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -61,6 +65,110 @@ class IDDeidentifier(FilterableTransformer):
     def _get_column_to_cast(self) -> str | None:
         """Get the column name to cast (the ID column being de-identified)."""
         return self.idconfig.name if self.idconfig else None
+
+    def _compare(
+        self,
+        original_df: pd.DataFrame,
+        reversed_df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame],
+    ):
+        """
+        Compare original and reversed ID columns to verify correctness.
+
+        Args:
+            original_df: Filtered and cast original DataFrame
+            reversed_df: Filtered and cast reversed DataFrame
+            deid_ref_dict: Dictionary of de-identification reference DataFrames
+
+        Returns:
+            List of ColumnComparisonResult objects
+
+        """
+        column_name = self.idconfig.name
+
+        if column_name not in original_df.columns:
+            return [
+                ColumnComparisonResult(
+                    column_name=column_name,
+                    status="error",
+                    message=f"Column '{column_name}' not found in original DataFrame",
+                    original_length=len(original_df),
+                    reversed_length=len(reversed_df),
+                    mismatch_count=0,
+                    mismatch_percentage=0.0,
+                )
+            ]
+
+        if column_name not in reversed_df.columns:
+            return [
+                ColumnComparisonResult(
+                    column_name=column_name,
+                    status="error",
+                    message=f"Column '{column_name}' not found in reversed DataFrame",
+                    original_length=len(original_df),
+                    reversed_length=len(reversed_df),
+                    mismatch_count=0,
+                    mismatch_percentage=0.0,
+                )
+            ]
+
+        original_series = original_df[column_name].reset_index(drop=True)
+        reversed_series = reversed_df[column_name].reset_index(drop=True)
+
+        original_length = len(original_series)
+        reversed_length = len(reversed_series)
+
+        # Check length match
+        if original_length != reversed_length:
+            return [
+                ColumnComparisonResult(
+                    column_name=column_name,
+                    status="error",
+                    message=f"Column '{column_name}' length mismatch: original has {original_length} rows, reversed has {reversed_length} rows",
+                    original_length=original_length,
+                    reversed_length=reversed_length,
+                    mismatch_count=abs(original_length - reversed_length),
+                    mismatch_percentage=100.0,
+                )
+            ]
+
+        # Compare values - handle NaN properly
+        both_nan = original_series.isna() & reversed_series.isna()
+        both_not_nan = ~original_series.isna() & ~reversed_series.isna()
+        values_equal = (original_series == reversed_series) & both_not_nan
+
+        # Mismatches are rows where values are not equal AND not both NaN
+        mismatches = ~(both_nan | values_equal)
+        mismatch_count = int(mismatches.sum())
+
+        if mismatch_count == 0:
+            return [
+                ColumnComparisonResult(
+                    column_name=column_name,
+                    status="pass",
+                    message=f"Column '{column_name}' matches perfectly",
+                    original_length=original_length,
+                    reversed_length=reversed_length,
+                    mismatch_count=0,
+                    mismatch_percentage=0.0,
+                )
+            ]
+
+        mismatch_percentage = (mismatch_count / original_length) * 100.0
+        sample_mismatch_indices = original_series[mismatches].index.tolist()[:100]
+
+        return [
+            ColumnComparisonResult(
+                column_name=column_name,
+                status="error",
+                message=f"Column '{column_name}' has {mismatch_count} mismatches ({mismatch_percentage:.2f}%)",
+                original_length=original_length,
+                reversed_length=reversed_length,
+                mismatch_count=mismatch_count,
+                mismatch_percentage=mismatch_percentage,
+                sample_mismatch_indices=sample_mismatch_indices,
+            )
+        ]
 
     def _apply_transform(
         self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]

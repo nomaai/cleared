@@ -6,6 +6,10 @@ import pandas as pd
 import logging
 from cleared.transformers.base import BaseTransformer
 from cleared.config.structure import IdentifierConfig, DeIDConfig
+from cleared.models.verify_models import ColumnComparisonResult
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -100,3 +104,67 @@ class ColumnDropper(BaseTransformer):
         """
         # In reverse mode, the column is already dropped, so just return as-is
         return df.copy(), deid_ref_dict.copy() if deid_ref_dict is not None else {}
+
+    def compare(
+        self,
+        original_df: pd.DataFrame,
+        reversed_df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+    ):
+        """
+        Compare original and reversed DataFrames for ColumnDropper.
+
+        For ColumnDropper, verification means checking that the column is missing
+        in the reversed DataFrame (which is expected behavior).
+
+        Args:
+            original_df: Original DataFrame before transformation
+            reversed_df: Reversed DataFrame after reverse transformation
+            deid_ref_dict: Dictionary of de-identification reference DataFrames (not used)
+
+        Returns:
+            List of ColumnComparisonResult objects
+
+        """
+        column_name = self.idconfig.name
+
+        # Check if column exists in original (it should)
+        if column_name not in original_df.columns:
+            return [
+                ColumnComparisonResult(
+                    column_name=column_name,
+                    status="error",
+                    message=f"Column '{column_name}' not found in original DataFrame (unexpected)",
+                    original_length=len(original_df),
+                    reversed_length=len(reversed_df),
+                    mismatch_count=0,
+                    mismatch_percentage=0.0,
+                )
+            ]
+
+        # Check if column is missing in reversed (it should be)
+        if column_name in reversed_df.columns:
+            return [
+                ColumnComparisonResult(
+                    column_name=column_name,
+                    status="error",
+                    message=f"Column '{column_name}' should be dropped but found in reversed DataFrame",
+                    original_length=len(original_df),
+                    reversed_length=len(reversed_df),
+                    mismatch_count=len(reversed_df),
+                    mismatch_percentage=100.0,
+                )
+            ]
+
+        # Column is correctly dropped - this is expected
+        return [
+            ColumnComparisonResult(
+                column_name=column_name,
+                status="warning",
+                message=f"Column '{column_name}' is missing in the reversed but this is correct behaviour",
+                original_length=len(original_df),
+                reversed_length=len(reversed_df),
+                mismatch_count=0,
+                mismatch_percentage=0.0,
+            )
+        ]

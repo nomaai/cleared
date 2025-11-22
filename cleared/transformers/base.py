@@ -9,6 +9,7 @@ from uuid import uuid4
 import networkx as nx
 import logging
 from cleared.config.structure import FilterConfig, DeIDConfig
+from cleared.models.verify_models import ColumnComparisonResult
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -112,6 +113,27 @@ class BaseTransformer(BaseTask):
         """
         pass
 
+    @abstractmethod
+    def compare(
+        self,
+        original_df: pd.DataFrame,
+        reversed_df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+    ) -> list[ColumnComparisonResult]:
+        """
+        Compare original and reversed DataFrames to verify correctness.
+
+        Args:
+            original_df: Original DataFrame before transformation
+            reversed_df: Reversed DataFrame after reverse transformation
+            deid_ref_dict: Dictionary of de-identification reference DataFrames (optional)
+
+        Returns:
+            List of ColumnComparisonResult objects
+
+        """
+        pass
+
 
 class FilterableTransformer(BaseTransformer):
     """Filterable transformer class that applies filters before transformation."""
@@ -202,6 +224,66 @@ class FilterableTransformer(BaseTransformer):
             deid_ref_dict: Dictionary of De-identification reference DataFrames
         Returns:
             Tuple of (reversed_df, updated_deid_ref_dict)
+
+        """
+        pass
+
+    def compare(
+        self,
+        original_df: pd.DataFrame,
+        reversed_df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+    ) -> list[ColumnComparisonResult]:
+        """
+        Compare original and reversed DataFrames with filtering and casting applied.
+
+        This method applies the same filters and value casting as transform/reverse,
+        then calls the abstract _compare method for the actual comparison.
+
+        Args:
+            original_df: Original DataFrame before transformation
+            reversed_df: Reversed DataFrame after reverse transformation
+            deid_ref_dict: Dictionary of de-identification reference DataFrames (optional)
+
+        Returns:
+            List of ColumnComparisonResult objects
+
+        """
+        if deid_ref_dict is None:
+            deid_ref_dict = {}
+
+        # Apply filters to both DataFrames
+        original_filtered = self.apply_filters(original_df)
+        reversed_filtered = self.apply_filters(reversed_df)
+
+        # Apply value casting if specified
+        if self.value_cast is not None:
+            original_filtered = self._apply_value_cast(original_filtered)
+            reversed_filtered = self._apply_value_cast(reversed_filtered)
+
+        # Call the abstract _compare method
+        return self._compare(original_filtered, reversed_filtered, deid_ref_dict)
+
+    @abstractmethod
+    def _compare(
+        self,
+        original_df: pd.DataFrame,
+        reversed_df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame],
+    ) -> list[ColumnComparisonResult]:
+        """
+        Compare filtered and cast original and reversed DataFrames.
+
+        Subclasses should implement this method to perform the actual comparison
+        logic for their specific transformation type.
+
+        Args:
+            original_df: Filtered and cast original DataFrame
+            reversed_df: Filtered and cast reversed DataFrame
+            deid_ref_dict: Dictionary of de-identification reference DataFrames
+
+        Returns:
+            List of ColumnComparisonResult objects
 
         """
         pass
@@ -448,6 +530,78 @@ class Pipeline(BaseTransformer):
             return self._run_sequentially(df, deid_ref_dict, reverse=True)
         else:
             return self._reverse_in_parallel(df, deid_ref_dict)
+
+    def compare(
+        self,
+        original_df: pd.DataFrame | None = None,
+        reversed_df: pd.DataFrame | None = None,
+        deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+    ) -> list[ColumnComparisonResult]:
+        """
+        Compare original and reversed DataFrames using all transformers in the pipeline.
+
+        Args:
+            original_df: Original DataFrame before transformation
+            reversed_df: Reversed DataFrame after reverse transformation
+            deid_ref_dict: Dictionary of de-identification reference DataFrames (optional)
+
+        Returns:
+            List of ColumnComparisonResult objects, one per transformer
+
+        """
+        if original_df is None or reversed_df is None:
+            return [
+                ColumnComparisonResult(
+                    column_name="pipeline_error",
+                    status="error",
+                    message="Both original_df and reversed_df must be provided",
+                    original_length=0,
+                    reversed_length=0,
+                    mismatch_count=0,
+                    mismatch_percentage=0.0,
+                )
+            ]
+
+        if deid_ref_dict is None:
+            deid_ref_dict = {}
+
+        if len(self.__transformers) == 0:
+            return [
+                ColumnComparisonResult(
+                    column_name="pipeline_empty",
+                    status="pass",
+                    message="No transformers in pipeline to compare",
+                    original_length=len(original_df),
+                    reversed_length=len(reversed_df),
+                    mismatch_count=0,
+                    mismatch_percentage=0.0,
+                )
+            ]
+
+        # Collect results from all transformers
+        results: list[ColumnComparisonResult] = []
+
+        for transformer in self.__transformers:
+            try:
+                result = transformer.compare(original_df, reversed_df, deid_ref_dict)
+                # Update column_name to include transformer UID for clarity
+                for r in result:
+                    r.column_name = f"{transformer.uid}_{r.column_name}"
+                    results.append(r)
+            except Exception as e:
+                results.append(
+                    ColumnComparisonResult(
+                        column_name=f"{transformer.uid}_error",
+                        status="error",
+                        message=f"Error during comparison: {e!s}",
+                        original_length=len(original_df),
+                        reversed_length=len(reversed_df),
+                        mismatch_count=0,
+                        mismatch_percentage=0.0,
+                    )
+                )
+
+        return results
 
     def _format_transformer_error(
         self,

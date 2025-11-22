@@ -161,6 +161,27 @@ class TestTransformerRegistryIntegration:
             def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
                 return df.copy(), deid_ref_dict.copy()
 
+            def compare(
+                self,
+                original_df: pd.DataFrame,
+                reversed_df: pd.DataFrame,
+                deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+            ) -> list:
+                """Mock compare method."""
+                from cleared.models.verify_models import ColumnComparisonResult
+
+                return [
+                    ColumnComparisonResult(
+                        column_name="mock_column",
+                        status="pass",
+                        message="Mock transformer comparison passed",
+                        original_length=len(original_df),
+                        reversed_length=len(reversed_df),
+                        mismatch_count=0,
+                        mismatch_percentage=0.0,
+                    )
+                ]
+
         custom_transformers = {"CustomTransformer": CustomTransformer}
         registry = TransformerRegistry(
             use_defaults=True, custom_transformers=custom_transformers
@@ -204,6 +225,27 @@ class TestTransformerRegistryIntegration:
 
             def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
                 return df.copy(), deid_ref_dict.copy()
+
+            def compare(
+                self,
+                original_df: pd.DataFrame,
+                reversed_df: pd.DataFrame,
+                deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+            ) -> list:
+                """Mock compare method."""
+                from cleared.models.verify_models import ColumnComparisonResult
+
+                return [
+                    ColumnComparisonResult(
+                        column_name="mock_column",
+                        status="pass",
+                        message="Mock transformer comparison passed",
+                        original_length=len(original_df),
+                        reversed_length=len(reversed_df),
+                        mismatch_count=0,
+                        mismatch_percentage=0.0,
+                    )
+                ]
 
         registry.register("TestTransformer", TestTransformer)
         assert len(registry) == 1
@@ -265,6 +307,27 @@ class TestTransformerRegistryIntegration:
             def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
                 return df.copy(), deid_ref_dict.copy()
 
+            def compare(
+                self,
+                original_df: pd.DataFrame,
+                reversed_df: pd.DataFrame,
+                deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+            ) -> list:
+                """Mock compare method."""
+                from cleared.models.verify_models import ColumnComparisonResult
+
+                return [
+                    ColumnComparisonResult(
+                        column_name="mock_column",
+                        status="pass",
+                        message="Mock transformer comparison passed",
+                        original_length=len(original_df),
+                        reversed_length=len(reversed_df),
+                        mismatch_count=0,
+                        mismatch_percentage=0.0,
+                    )
+                ]
+
         # Register many transformers
         for i in range(100):
             registry.register(f"Transformer{i}", TestTransformer)
@@ -292,6 +355,27 @@ class TestTransformerRegistryIntegration:
 
             def reverse(self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]):
                 return df.copy(), deid_ref_dict.copy()
+
+            def compare(
+                self,
+                original_df: pd.DataFrame,
+                reversed_df: pd.DataFrame,
+                deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+            ) -> list:
+                """Mock compare method."""
+                from cleared.models.verify_models import ColumnComparisonResult
+
+                return [
+                    ColumnComparisonResult(
+                        column_name="mock_column",
+                        status="pass",
+                        message="Mock transformer comparison passed",
+                        original_length=len(original_df),
+                        reversed_length=len(reversed_df),
+                        mismatch_count=0,
+                        mismatch_percentage=0.0,
+                    )
+                ]
 
         class DerivedTransformer(BaseCustomTransformer):
             def __init__(self, base_param: str, derived_param: str):

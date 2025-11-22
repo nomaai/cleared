@@ -18,8 +18,6 @@ from cleared.cli.cmds.verify.model import (
     VerificationResult,
 )
 from cleared.cli.cmds.verify.utils import (
-    get_column_dropper_columns,
-    load_data_for_table,
     print_verification_results,
 )
 from cleared.config.structure import ClearedConfig
@@ -95,8 +93,6 @@ def register_verify_command(app: typer.Typer) -> None:
             result = verify_data(
                 config,
                 reverse_data_path,
-                load_data_fn=load_data_for_table,
-                get_dropped_columns_fn=get_column_dropper_columns,
             )
 
             # Print results
@@ -139,56 +135,76 @@ def register_verify_command(app: typer.Typer) -> None:
 def verify_data(
     config: ClearedConfig,
     reverse_data_path: Path,
-    load_data_fn: Callable[[ClearedConfig, str, Path], pd.DataFrame | None],
-    get_dropped_columns_fn: Callable[[ClearedConfig, str], set[str]],
+    load_data_fn: Callable[[ClearedConfig, str, Path], pd.DataFrame | None]
+    | None = None,
+    get_dropped_columns_fn: Callable[[ClearedConfig, str], set[str]] | None = None,
 ) -> VerificationResult:
     """
-    Verify reversed data against original data.
+    Verify reversed data against original data using transformer-based comparison.
 
     Args:
         config: The ClearedConfig object.
         reverse_data_path: The path to the reversed data.
-        load_data_fn: The function to load the data.
-        get_dropped_columns_fn: The function to get the dropped columns.
+        load_data_fn: Deprecated - not used anymore (kept for backward compatibility)
+        get_dropped_columns_fn: Deprecated - not used anymore (kept for backward compatibility)
 
     Returns:
         A VerificationResult object.
 
     """
-    # Load original data
-    original_data_path = Path(config.io.data.input_config.configs["base_path"])
+    from cleared.engine import ClearedEngine
 
-    # Load reversed data
+    # Create engine from config
+    engine = ClearedEngine.from_config(config)
+
+    # Get original data path from config
+    original_data_path = Path(config.io.data.input_config.configs["base_path"])
     reverse_data_path = Path(reverse_data_path)
 
+    # Use engine's verify method
+    verification_results = engine.verify(
+        original_data_path=original_data_path,
+        reversed_data_path=reverse_data_path,
+    )
+
+    # Convert engine results to VerificationResult model
+    # Engine now returns list[ColumnComparisonResult] per table
     table_results: list[TableVerificationResult] = []
 
-    # Verify each table
-    for table_name in config.tables.keys():
-        original_df = load_data_fn(config, table_name, original_data_path)
-        reversed_df = load_data_fn(config, table_name, reverse_data_path)
+    for table_name, column_results in verification_results["table_results"].items():
+        # column_results is already a list[ColumnComparisonResult] from the engine
 
-        if original_df is None:
-            table_results.append(
-                _create_error_status_result(
-                    table_name, f"Could not load original data for table '{table_name}'"
-                )
+        # Determine table status from column results
+        table_status = "pass"
+        errors: list[str] = []
+        warnings: list[str] = []
+
+        for col_result in column_results:
+            if col_result.status == "error":
+                table_status = "error"
+                errors.append(col_result.message)
+            elif col_result.status == "warning" and table_status != "error":
+                table_status = "warning"
+                warnings.append(col_result.message)
+
+        passed_count = sum(1 for c in column_results if c.status == "pass")
+        error_count = sum(1 for c in column_results if c.status == "error")
+        warning_count = sum(1 for c in column_results if c.status == "warning")
+        total_columns = len(column_results)
+
+        table_results.append(
+            TableVerificationResult(
+                table_name=table_name,
+                status=table_status,
+                total_columns=total_columns,
+                passed_columns=passed_count,
+                error_columns=error_count,
+                warning_columns=warning_count,
+                errors=errors,
+                warnings=warnings,
+                column_results=column_results,
             )
-            continue
-
-        if reversed_df is None:
-            table_results.append(
-                _create_error_status_result(
-                    table_name, f"Could not load reversed data for table '{table_name}'"
-                )
-            )
-            continue
-
-        dropped_columns = get_dropped_columns_fn(config, table_name)
-        result = verify_table(
-            config, table_name, original_df, reversed_df, dropped_columns
         )
-        table_results.append(result)
 
     return _prepare_verification_result(table_results, config.name, reverse_data_path)
 

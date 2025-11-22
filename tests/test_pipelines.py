@@ -58,6 +58,27 @@ class MockTransformer(BaseTransformer):
             result_df = result_df.drop(columns=["transformed"])
         return result_df, deid_ref_dict.copy() if deid_ref_dict is not None else {}
 
+    def compare(
+        self,
+        original_df: pd.DataFrame,
+        reversed_df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+    ) -> list:
+        """Mock compare method that returns a pass result."""
+        from cleared.models.verify_models import ColumnComparisonResult
+
+        return [
+            ColumnComparisonResult(
+                column_name="mock_column",
+                status="pass",
+                message="Mock transformer comparison passed",
+                original_length=len(original_df),
+                reversed_length=len(reversed_df),
+                mismatch_count=0,
+                mismatch_percentage=0.0,
+            )
+        ]
+
 
 class MockDataLoader(BaseDataLoader):
     """Mock data loader for testing."""

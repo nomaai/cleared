@@ -1,9 +1,4 @@
-"""
-Data models for verification results.
-
-This module re-exports models from cleared.models.verify_models for backward compatibility.
-New code should import directly from cleared.models.
-"""
+"""Shared models for cleared."""
 
 from cleared.models.verify_models import (
     ColumnComparisonResult,

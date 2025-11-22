@@ -269,7 +269,8 @@ class TransformerRegistry:
                         raise TypeError(
                             f"{transformer_class.__name__}.__init__() got an unexpected keyword argument '{unexpected_params[0]}'"
                         )
-                    else:
+
+                    elif len(unexpected_params) > 1:
                         param_str = ", ".join(f"'{p}'" for p in unexpected_params)
                         raise TypeError(
                             f"{transformer_class.__name__}.__init__() got unexpected keyword arguments: {param_str}"
