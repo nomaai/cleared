@@ -151,7 +151,20 @@ Areas you can help with:
 
 ## 📜 License and Disclaimer
 
-This project is licensed under the [Apache 2.0 License](https://www.apache.org/licenses/LICENSE-2.0).
+This project is licensed under the **Apache License 2.0 with Commons Clause restriction**.
+
+The Software is provided under the Apache License 2.0, with an additional restriction that prohibits:
+- **Selling** the Software (including licensing, distributing for a fee, or deriving commercial advantage)
+- **Offering the Software as a Service (SaaS)** (including hosted, cloud, or web-based services where the Software is the primary function)
+
+
+This restriction does **not** apply to:
+- Internal use within your organization
+- Research, educational, or non-commercial purposes
+- Contributing modifications back to the Software
+- Integrating the Software into commercial products where it's not the primary value proposition
+
+For full license terms, see [LICENSE](LICENSE). For commercial licensing options, please contact the copyright holder.
 
 > ⚠️ Disclaimer: This library is provided "as is" without warranty of any kind. It is not a certified compliance tool. You are responsible for validating its use in regulated or clinical environments. 
 

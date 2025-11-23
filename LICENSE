@@ -200,3 +200,41 @@
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+
+
+===============================================================================
+
+COMMONS CLAUSE RESTRICTION – NO SELLING AND NO SAAS OFFERING
+
+===============================================================================
+
+The Software is provided under the Apache License 2.0, except that the following 
+additional restriction applies:
+
+You are prohibited from Selling the Software.
+
+For the purposes of this restriction, "Selling" the Software includes, without 
+limitation:
+
+1. Charging a fee, receiving compensation, or deriving commercial advantage for:
+   a. Selling, licensing, or distributing the unmodified Software,
+   b. Selling a product or service whose value derives primarily from the Software, or
+   c. Selling access to a hosted or managed service where the primary purpose is to 
+      operate, host, serve, or process requests using the Software.
+
+2. Offering the Software as a Service ("SaaS"), including:
+   a. Operating the Software (modified or unmodified) as part of a hosted, cloud, 
+      web-based, or remote service, where the primary function of the service is 
+      provided by the Software,
+   b. Providing access to the Software (directly or indirectly) via an API, web 
+      interface, queued job, or other remote execution method.
+
+This restriction does not apply to:
+- Internal use of the Software within your organization
+- Contributing modifications back to the Software
+- Using the Software for research, educational, or non-commercial purposes
+- Integrating the Software into your own products where the Software is not the 
+  primary value proposition
+
+If you wish to use the Software in a manner that would otherwise violate this 
+restriction, please contact the copyright holder to discuss licensing options.
