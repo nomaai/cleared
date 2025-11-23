@@ -83,6 +83,19 @@ jobs:
           git remote set-url origin \
             https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
 
+      - name: Checkout main branch for version bump
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          # Get the default branch name (usually 'main' or 'master')
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          if [ -z "${DEFAULT_BRANCH}" ]; then
+            DEFAULT_BRANCH="main"
+          fi
+          echo "Checking out ${DEFAULT_BRANCH} branch for version bump..."
+          git fetch origin ${DEFAULT_BRANCH}
+          git checkout ${DEFAULT_BRANCH}
+          git pull origin ${DEFAULT_BRANCH}
+
       - name: Get current version
         id: current_version
         run: |
@@ -104,6 +117,16 @@ jobs:
           NEW_VERSION=$(cat VERSION)
           VERSION_TAG="v${NEW_VERSION}"
           
+          # Verify version was updated in pyproject.toml
+          PYPROJECT_VERSION=$(poetry version --short)
+          if [ "${PYPROJECT_VERSION}" != "${NEW_VERSION}" ]; then
+            echo "ERROR: Version mismatch!"
+            echo "VERSION file: ${NEW_VERSION}"
+            echo "pyproject.toml: ${PYPROJECT_VERSION}"
+            exit 1
+          fi
+          
+          echo "Verified: pyproject.toml version is ${PYPROJECT_VERSION}"
           echo "new_version=${NEW_VERSION}" >> "$GITHUB_OUTPUT"
           echo "version_tag=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
           echo "New version: ${NEW_VERSION}"
@@ -139,6 +162,17 @@ jobs:
       - name: Build distribution packages
         run: |
           echo "Building distribution packages..."
+          # Verify version before building
+          EXPECTED_VERSION="${{ steps.version_bump.outputs.new_version }}"
+          if [ -n "${EXPECTED_VERSION}" ]; then
+            ACTUAL_VERSION=$(poetry version --short)
+            echo "Expected version: ${EXPECTED_VERSION}"
+            echo "Actual version in pyproject.toml: ${ACTUAL_VERSION}"
+            if [ "${ACTUAL_VERSION}" != "${EXPECTED_VERSION}" ]; then
+              echo "ERROR: Version mismatch before build!"
+              exit 1
+            fi
+          fi
           task build
           ls -la dist/
 
@@ -155,7 +189,13 @@ jobs:
           git add VERSION pyproject.toml CHANGELOG.md
           git commit -m "chore: bump version to ${{ steps.version_bump.outputs.new_version }}" \
             || echo "No changes to commit"
-          git push origin HEAD:${{ github.ref_name }} || echo "Nothing to push"
+          # Always push to default branch (main) to keep version in sync
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          if [ -z "${DEFAULT_BRANCH}" ]; then
+            DEFAULT_BRANCH="main"
+          fi
+          echo "Pushing version changes to ${DEFAULT_BRANCH} branch..."
+          git push origin HEAD:${DEFAULT_BRANCH} || echo "Nothing to push"
 
       - name: Create and push tag
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'
@@ -259,7 +299,7 @@ jobs:
 
       - name: Install twine
         run: |
-          poetry add --group dev twine || pip install twine
+          poetry run pip install twine
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
