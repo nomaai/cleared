@@ -88,7 +88,7 @@ jobs:
           echo "Bumping version: ${BUMP_TYPE}"
           
           # Use task to bump version
-          task version-bump "${BUMP_TYPE}"
+          task version-bump $BUMP_TYPE
           
           # Get new version
           NEW_VERSION=$(cat VERSION)
