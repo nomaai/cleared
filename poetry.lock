@@ -5757,9 +5757,9 @@ test = ["big-O", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more_it
 type = ["pytest-mypy"]
 
 [extras]
-dev = ["actionlint-py", "coverage", "fastparquet", "gitchangelog", "ipykernel", "jupyterlab", "mkdocs", "openpyxl", "pre-commit", "pyarrow", "pytest", "pytest-cov", "pytest-mock", "ruff", "xlrd"]
+dev = ["actionlint-py", "coverage", "fastparquet", "gitchangelog", "ipykernel", "jupyterlab", "mkdocs", "openpyxl", "pre-commit", "pyarrow", "pytest", "pytest-cov", "pytest-mock", "ruff", "twine", "xlrd"]
 
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.14"
-content-hash = "6695781f0b4a5d0d337a22eaa88cbd5b1da328ad3471f2a4401898615ab5bd1c"
+content-hash = "f23ace83c088acbf621feea3d9be251ba509ede511517543cb2d346e51312a87"
