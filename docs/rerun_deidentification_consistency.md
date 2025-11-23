@@ -465,8 +465,6 @@ def validate_consistency(prev_version, curr_version):
     return True, "All mappings consistent"
 ```
 
-## Next Steps
+## Next Tutorial
 
-- Learn about [multi-table consistency](multi_table_pipeline_config.md) for related data
-- Check out [performance optimization](performance_tips.md) for large datasets
-- Explore [custom transformers](custom_transformers.md) for specialized de-identification needs
+Continue to the next tutorial: [Reversing De-identification](reverse.md) - Restore original values from de-identified data

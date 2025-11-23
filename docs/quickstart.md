@@ -1,8 +1,26 @@
 # Quickstart Guide
 
-This guide shows you how to get started with Cleared for de-identifying a single table using transformers directly.
+This guide covers running the de-identification pipeline on your data.
 
-## Prerequisites
+## Overview
+
+Before running on your data:
+1. ✅ Install Cleared (see [Installation](#installation))
+2. ✅ Validate configuration (see [Step 2: Validate Configuration](#step-2-validate-configuration))
+3. ✅ Test on sample data (see [Step 4: Test Run](#step-4-test-run))
+
+The workflow consists of eight main steps:
+
+1. **Run Setup** - Create all required directories
+2. **Validate Configuration** - Verify configuration is correct
+3. **Prepare Input Data** - Place your data files
+4. **Test Run** - Dry-run with limited data to verify configuration
+5. **Run De-identification** - De-identify the data
+6. **Reverse De-identification** - Reverse the de-identification to verify reversibility
+7. **Verify Results** - Compare original and reversed data
+8. **Generate Report** - Create an HTML report of verification results
+
+## Installation
 
 Make sure you have Cleared installed:
 
@@ -10,306 +28,68 @@ Make sure you have Cleared installed:
 pip install cleared
 ```
 
-## Basic Single Table De-identification
-
-Let's start with a simple example of de-identifying a users table with ID de-identification, datetime shifting, and column dropping.
-
-### 1. Import Required Modules
-
-```python
-import pandas as pd
-from datetime import datetime
-import cleared as clr
-```
-
-### 2. Create Sample Data
-
-```python
-# Get sample users data
-users_df = clr.sample_data.users_single_table
-
-print("Original data:")
-print(users_df)
-```
-
-**Sample Data Preview:**
-| user_id | name           | reg_date_time        | zipcode |
-|---------|----------------|---------------------|---------|
-| 101     | Alice Johnson  | 2020-01-15 10:30:00 | 10001   |
-| 202     | Bob Smith      | 2019-06-22 14:45:00 | 90210   |
-| 303     | Charlie Brown  | 2021-03-08 09:15:00 | 60601   |
-| 404     | Diana Prince   | 2018-11-12 16:20:00 | 33101   |
-| 505     | Eve Wilson     | 2022-07-03 11:55:00 | 98101   |
-
-### 3. Configure De-identification
-
-```python
-# Configure user ID de-identification
-user_id_config = clr.IdentifierConfig(
-    name="user_id",
-    uid="user_uid",
-    description="User identifier"
-)
-
-# Configure datetime shifting (random years between -5 and 5)
-time_shift_config = clr.TimeShiftConfig(
-    method="shift_by_years",
-    min=-5,
-    max=5
-)
-
-deid_config = clr.DeIDConfig(
-    time_shift=time_shift_config
-)
-```
-
-### 4. Create TablePipeline
-
-```python
-# Create transformers for the pipeline
-transformers = [
-    clr.IDDeidentifier(idconfig=user_id_config),
-    clr.DateTimeDeidentifier(
-        idconfig=user_id_config,
-        deid_config=deid_config,
-        datetime_column="reg_date_time"
-    ),
-    clr.ColumnDropper(
-        idconfig=clr.IdentifierConfig(
-            name="name",
-            uid="name_drop",
-            description="User name to drop"
-        )
-    )
-]
-
-# Create a simple IO config (not used since we're providing data directly)
-io_config = clr.PairedIOConfig(
-    input_config=clr.IOConfig(io_type="filesystem", configs={"base_path": "."}),
-    output_config=clr.IOConfig(io_type="filesystem", configs={"base_path": "."})
-)
-
-# Create table pipeline
-table_pipeline = clr.TablePipeline(
-    table_name="users",
-    io_config=io_config,
-    deid_config=deid_config,
-    transformers=transformers
-)
-```
-
-### 5. Apply Transformations
-
-```python
-# Run the pipeline with the input data
-# The pipeline will process the DataFrame without reading/writing files
-users_df_deid, deid_ref_dict = table_pipeline.transform(users_df)
-
-print("\nDe-identified data:")
-print(users_df_deid)
-```
-
-### 6. Verify Results
-
-```python
-# Check that transformations worked
-print(f"Original user IDs: {sorted(users_df['user_id'].unique())}")
-print(f"De-identified user IDs: {sorted(users_df_deid['user_id'].unique())}")
-
-# Check that name column was dropped
-print(f"Columns after transformation: {list(users_df_deid.columns)}")
-
-# Check that dates were shifted
-print(f"Original dates: {users_df['reg_date_time'].head()}")
-print(f"Shifted dates: {users_df_deid['reg_date_time'].head()}")
-```
-
-### 7. Access De-identification Mappings
-
-```python
-# Access the ID mapping
-id_mapping = deid_ref_dict.get("user_uid")
-print("\nID Mapping:")
-print(id_mapping)
-
-# Access the time shift mapping
-time_shift_mapping = deid_ref_dict.get("user_uid_shift")
-print("\nTime Shift Mapping:")
-print(time_shift_mapping)
-```
-
-## Complete Example
-
-Here's the complete script:
-
-```python
-import cleared as clr
-
-# Get sample data
-users_df = clr.sample_data.users_single_table
-
-# Configure de-identification
-user_id_config = clr.IdentifierConfig(
-    name="user_id",
-    uid="user_uid",
-    description="User identifier"
-)
-
-time_shift_config = clr.TimeShiftConfig(
-    method="shift_by_years",
-    min=-5,
-    max=5
-)
-
-deid_config = clr.DeIDConfig(time_shift=time_shift_config)
-
-# Create transformers for the pipeline
-transformers = [
-    clr.IDDeidentifier(idconfig=user_id_config),
-    clr.DateTimeDeidentifier(
-        idconfig=user_id_config,
-        deid_config=deid_config,
-        datetime_column="reg_date_time"
-    ),
-    clr.ColumnDropper(
-        idconfig=clr.IdentifierConfig(
-            name="name",
-            uid="name_drop",
-            description="User name to drop"
-        )
-    )
-]
-
-# Create a simple IO config (not used since we're providing data directly)
-io_config = clr.PairedIOConfig(
-    input_config=clr.IOConfig(io_type="filesystem", configs={"base_path": "."}),
-    output_config=clr.IOConfig(io_type="filesystem", configs={"base_path": "."})
-)
-
-# Create table pipeline
-table_pipeline = clr.TablePipeline(
-    table_name="users",
-    io_config=io_config,
-    deid_config=deid_config,
-    transformers=transformers
-)
-
-# Apply transformations
-users_df_deid, deid_ref_dict = table_pipeline.transform(users_df)
-
-print("De-identification complete!")
-print(f"Original shape: {users_df.shape}")
-print(f"De-identified shape: {users_df_deid.shape}")
-print(f"Columns: {list(users_df_deid.columns)}")
-```
-
-## Testing Your Configuration
-
-Before running your configuration on the full dataset, you can test it with a limited number of rows using the `cleared test` command. This performs a dry run that processes only the first N rows of each table and does not write any outputs, making it safe to test your configuration:
+## Step 1: Run Setup
 
 ```bash
-# Test with default 10 rows per table
-cleared test config.yaml
+cleared setup config.yaml
+```
 
-# Test with more rows
+This command creates all required directories specified in your configuration file.
+
+## Step 2: Validate Configuration
+
+```bash
+cleared validate config.yaml
+```
+
+This validates your configuration file syntax and checks for common issues.
+
+## Step 3: Prepare Input Data
+
+Place your CSV files in the input directory specified in your configuration file. The file names should match the table names defined in your configuration.
+
+For example, if your configuration defines a table named `users`, place your data file as `users.csv` in the input directory.
+
+## Step 4: Test Run
+
+```bash
 cleared test config.yaml --rows 50
 ```
 
-The test command runs the same process as `cleared run` but:
-- Only processes the first N rows of each table (configurable with `--rows`)
-- Does not write any output files (dry run mode)
-- Validates that your configuration works correctly without modifying data
+This performs a dry run that processes only the first 50 rows of each table and does not write any outputs, making it safe to test your configuration.
 
-This is especially useful for:
-- Verifying your transformers work as expected
-- Testing complex configurations before full runs
-- Debugging configuration issues with a small sample
-
-## Viewing Configuration Details
-
-Before running your configuration, you can generate a visual HTML report to review all configuration details:
+## Step 5: Run De-identification
 
 ```bash
-# Generate an HTML report of your configuration
-cleared describe config.yaml
-
-# Or specify a custom output file
-cleared describe config.yaml -o my_config_report.html
+cleared run config.yaml
 ```
 
-The report includes:
-- Overview statistics (tables, transformers, dependencies)
-- De-identification configuration details
-- I/O configuration settings
-- Detailed transformer information for each table
-- Interactive features (sorting, filtering, PDF export)
+This runs the full de-identification pipeline on your data. The de-identified data will be written to the output directory, and de-identification mappings will be saved to the deid_ref directory.
 
-Open the generated HTML file in your browser to view the comprehensive configuration report.
-
-## Validating Configuration Files
-
-If you're using configuration files (YAML) instead of programmatic setup, you can validate your configuration before running the de-identification process using the `cleared validate` command.
-
-### Validate a Configuration File
-
-The `cleared validate` command performs comprehensive validation by:
-1. **Checking configuration syntax** - Verifies the configuration can be loaded and initialized
-2. **Linting the configuration** - Performs YAML syntax checking and Cleared-specific rule validation
+## Step 6: Reverse De-identification
 
 ```bash
-# Validate a configuration file
-cleared validate config.yaml
-
-# Validate with strict mode (treats warnings as errors)
-cleared validate config.yaml --strict
-
-# Validate with verbose output
-cleared validate config.yaml --verbose
+cleared reverse config.yaml --output ./reversed
 ```
 
-**Example Output:**
-```bash
-$ cleared validate config.yaml
+This reverses the de-identification using the saved mappings, allowing you to verify that the process is reversible.
 
-🔍 Step 1: Checking configuration syntax...
-Configuration loaded from: config.yaml
-✅ Configuration is valid!
-Engine would be initialized with 1 pipelines
-
-✅ Syntax check passed
-
-🔍 Step 2: Linting configuration...
-
-📋 Running YAML linting (yamllint)...
-  ✅ No YAML syntax issues found
-
-🔍 Running Cleared-specific linting...
-  ✅ No Cleared-specific issues found
-
-============================================================
-✅ Validation completed successfully!
-============================================================
-```
-
-If there are any issues, the command will report them with specific rule IDs and line numbers. For a complete reference of all linting rules, see the [Linting Rules Reference](linting_rules.md).
-
-### Other Validation Commands
-
-You can also use more specific validation commands:
+## Step 7: Verify Results
 
 ```bash
-# Check syntax only (without linting)
-cleared check-syntax config.yaml
-
-# Lint only (without syntax checking)
-cleared lint config.yaml
+cleared verify config.yaml ./reversed -o verify-results.json
 ```
 
-## Next Steps
+This compares the original data with the reversed data to ensure they match, generating a JSON file with detailed verification results.
 
-1. **Test your configuration** with `cleared test config.yaml` to verify everything works
-2. Learn about [using configuration files](use_cleared_config.md) for more complex setups
-3. Explore [multi-table pipelines](multi_table_pipeline_config.md) for related data
-4. Check out the [CLI Usage Guide](cli-usage.md) for all available commands
-5. Review the [Linting Rules Reference](linting_rules.md) for configuration validation rules
-6. Check out the [API reference](../api/) for more transformer options
+## Step 8: Generate Report
+
+```bash
+cleared report-verify verify-results.json -o verification-report.html
+```
+
+This generates a comprehensive HTML report of the verification results, making it easy to review the comparison between original and reversed data.
+
+## Next Tutorial
+
+Continue to the next tutorial: [Single Table Example](use_cleared_config.md) - De-identification with YAML configs and CLI

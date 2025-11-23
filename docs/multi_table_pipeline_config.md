@@ -612,8 +612,6 @@ print(f"  Dependencies: {table_config.depends_on}")
 print(f"  Transformers: {[t.uid for t in table_config.transformers]}")
 ```
 
-## Next Steps
+## Next Tutorial
 
-- Learn about [using Cleared with engines](engine_usage.md) for more complex workflows
-- Check out [performance optimization](performance_tips.md) for large datasets
-- Explore [custom transformers](custom_transformers.md) for specialized de-identification needs
+Continue to the next tutorial: [Rerun De-identification with Consistency](rerun_deidentification_consistency.md) - Maintain consistency when adding new data
