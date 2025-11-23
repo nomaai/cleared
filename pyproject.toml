@@ -1,7 +1,7 @@
 [project]
 name = "cleared"
-version = "0.4.1"
-description = "An open-source multi-purpose de-identification library with special support for healthcare applications. Provides robust tools to de-identify multi-table, multimodal datasets while maintaining clinical integrity and research utility."
+version = "0.3.3"
+description = "A data de-identification framework for python"
 authors = [
     {name = "NOMA AI INC."}
 ]
@@ -49,7 +49,6 @@ dev = [
     "gitchangelog==3.0.4",
     "pytest-mock>=3.13.0",
     "actionlint-py>=1.7.8.24",
-    "twine>=6.2.0",
     "pyarrow>=18.0.0",
     "openpyxl>=3.1.5",
     "xlrd>=2.0.1",
@@ -80,7 +79,6 @@ pyarrow = "^18.0.0"
 openpyxl = "^3.1.5"
 xlrd = "^2.0.1"
 fastparquet = "^2024.11.0"
-twine = "^6.2.0"
 
 [build-system]
 requires = ["poetry-core"]
