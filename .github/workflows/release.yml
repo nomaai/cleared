@@ -146,7 +146,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: dist-packages
-          path: dist/*
+          path: dist/
           retention-days: 7
 
       - name: Commit version changes
@@ -250,11 +250,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install Task runner
-        uses: arduino/setup-task@v1
-        with:
-          version: 3.x
-
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
@@ -262,11 +257,9 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
 
-      - name: Install OS dependencies
-        run: task install-os-deps
-
-      - name: Install dependencies
-        run: task setup-env
+      - name: Install twine
+        run: |
+          poetry add --group dev twine || pip install twine
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -274,28 +267,48 @@ jobs:
           name: dist-packages
           path: dist/
 
+      - name: Verify packages exist
+        run: |
+          echo "Checking for distribution packages..."
+          echo "Current directory: $(pwd)"
+          ls -la dist/ || echo "dist/ directory not found"
+          echo "Package files:"
+          find dist/ -type f \( -name "*.whl" -o -name "*.tar.gz" \) 2>/dev/null || echo "No matching files found"
+          if [ -d "dist/" ]; then
+            echo "Contents of dist/:"
+            ls -lah dist/
+          fi
+
       - name: Publish to PyPI
         env:
-          POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_API_TOKEN }}
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
         run: |
           echo "Publishing to PyPI..."
+          echo "Current directory: $(pwd)"
+          echo "Checking dist/ directory:"
+          ls -la dist/ || echo "dist/ directory does not exist"
+          
           # Check if packages exist
           PACKAGES_FOUND=false
           for file in dist/*.whl dist/*.tar.gz; do
             if [ -f "${file}" ]; then
               PACKAGES_FOUND=true
-              break
+              echo "Found package: ${file}"
             fi
           done
           
           if [ "${PACKAGES_FOUND}" = "false" ]; then
             echo "Error: No distribution packages found in dist/"
+            echo "Contents of current directory:"
+            ls -la
+            echo "Looking for dist directory:"
+            find . -type d -name "dist" 2>/dev/null || echo "No dist directory found"
             exit 1
           fi
           
-          # Publish using Poetry (publish command uses dist/ by default)
-          # Poetry will automatically use POETRY_PYPI_TOKEN_PYPI environment variable
-          poetry publish --no-interaction || {
+          # Publish using twine (more reliable for pre-built packages)
+          poetry run twine upload dist/*.whl dist/*.tar.gz || {
             echo "Publishing failed. This might be because:"
             echo "  - The version already exists on PyPI"
             echo "  - PyPI API token is invalid"
