@@ -28,7 +28,7 @@ def _print_header() -> None:
     typer.echo("=" * 50)
     typer.echo("Version: 0.1.0")
     typer.echo("Author: NOMA AI INC.")
-    typer.echo("License: Apache-2.0")
+    typer.echo("License: Apache-2.0 with Commons Clause restriction")
     typer.echo("")
 
 

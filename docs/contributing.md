@@ -270,7 +270,7 @@ cleared/
 
 ## License
 
-By contributing to Cleared, you agree that your contributions will be licensed under the Apache License 2.0.
+By contributing to Cleared, you agree that your contributions will be licensed under the Apache License 2.0 with Commons Clause restriction. This means the Software cannot be sold or offered as a SaaS service, but can be used internally, for research, and integrated into products where it's not the primary value proposition.
 
 ---
 

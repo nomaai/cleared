@@ -54,7 +54,7 @@ By using this software, you agree that:
 
 ## 📜 License
 
-This project is licensed under the [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), which includes a limitation of liability and disclaimer of warranties.
+This project is licensed under the [Apache License 2.0 with Commons Clause restriction](LICENSE), which includes a limitation of liability and disclaimer of warranties. The Commons Clause prohibits selling the Software or offering it as a SaaS service, while allowing internal use, research, and integration into products where the Software is not the primary value proposition.
 
 ---
 
