@@ -259,21 +259,23 @@ tasks:
   version-bump:
     desc: >
       Bump the project version (major, minor, or patch).
-      Usage: task version-bump [major|minor|patch]. Updates both VERSION file and pyproject.toml.
+      Usage: task version-bump -- [major|minor|patch] or task version-bump BUMP_TYPE=[major|minor|patch].
+             Updates both VERSION file and pyproject.toml.
+    vars:
+      BUMP_TYPE: "{{.CLI_ARGS}}"
     cmds:
       - |
-        if [ -z "{{.CLI_ARGS}}" ]; then
-          echo "Usage: task version-bump [major|minor|patch]"
-          echo "Example: task version-bump patch"
+        if [ -z "{{.BUMP_TYPE}}" ]; then
+          echo "Usage: task version-bump -- [major|minor|patch]"
+          echo "Example: task version-bump -- patch"
           exit 1
         fi
-        BUMP_TYPE="{{.CLI_ARGS}}"
-        if [ "$BUMP_TYPE" != "major" ] && [ "$BUMP_TYPE" != "minor" ] && [ "$BUMP_TYPE" != "patch" ]; then
+        if [ "{{.BUMP_TYPE}}" != "major" ] && [ "{{.BUMP_TYPE}}" != "minor" ] && [ "{{.BUMP_TYPE}}" != "patch" ]; then
           echo "Error: Bump type must be 'major', 'minor', or 'patch'"
           exit 1
         fi
-        echo "Bumping version ($BUMP_TYPE)..."
-        poetry version $BUMP_TYPE
+        echo "Bumping version ({{.BUMP_TYPE}})..."
+        poetry version {{.BUMP_TYPE}}
         NEW_VERSION=$(poetry version --short)
         echo "$NEW_VERSION" > VERSION
         echo "Version bumped to: $NEW_VERSION"
