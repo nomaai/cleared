@@ -250,6 +250,11 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      - name: Install Task runner
+        uses: arduino/setup-task@v1
+        with:
+          version: 3.x
+
       - name: Install Poetry
         uses: snok/install-poetry@v1
         with:
