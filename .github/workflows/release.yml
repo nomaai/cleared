@@ -87,8 +87,8 @@ jobs:
           BUMP_TYPE="${{ github.event.inputs.version_bump }}"
           echo "Bumping version: ${BUMP_TYPE}"
           
-          # Use task to bump version
-          task version-bump $BUMP_TYPE
+          # Use task to bump version (using -- separator to pass argument)
+          task version-bump -- ${BUMP_TYPE}
           
           # Get new version
           NEW_VERSION=$(cat VERSION)
