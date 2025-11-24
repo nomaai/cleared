@@ -71,54 +71,134 @@ install_pre_commit() {
     fi
 }
 
-# Function to install actionlint
+# Function to install actionlint with retry
 install_actionlint() {
     echo "🔧 Installing actionlint..."
     if command -v actionlint >/dev/null 2>&1; then
         echo "✅ actionlint is already installed"
     else
         if [[ "$OS" == "Linux" ]]; then
-            # Download and install actionlint for Linux
-            # Use a more robust approach for CI environments
-            LATEST_URL=$(curl -s https://api.github.com/repos/rhysd/actionlint/releases/latest | grep "browser_download_url.*linux_amd64.tar.gz" | cut -d '"' -f 4)
-            if [ -n "$LATEST_URL" ]; then
-                echo "📥 Downloading actionlint from: $LATEST_URL"
-                # Download to a temporary file first to avoid pipe issues
-                TEMP_FILE=$(mktemp)
-                if curl -sL "$LATEST_URL" -o "$TEMP_FILE"; then
-                    echo "📦 Extracting actionlint..."
-                    if tar -xzf "$TEMP_FILE" && rm "$TEMP_FILE"; then
-                        sudo mv actionlint /usr/local/bin/
-                        echo "✅ actionlint installed via direct download."
+            # Download and install actionlint for Linux with retry logic
+            MAX_RETRIES=3
+            RETRY_DELAY=60
+            RETRY_COUNT=0
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                echo "📥 Attempting to install actionlint (attempt $RETRY_COUNT/$MAX_RETRIES)..."
+                
+                LATEST_URL=$(curl -s https://api.github.com/repos/rhysd/actionlint/releases/latest | grep "browser_download_url.*linux_amd64.tar.gz" | cut -d '"' -f 4)
+                
+                if [ -z "$LATEST_URL" ]; then
+                    echo "⚠️  Failed to get actionlint download URL."
+                    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                        echo "⏳ Waiting ${RETRY_DELAY} seconds before retry..."
+                        sleep $RETRY_DELAY
+                        continue
                     else
-                        echo "❌ Failed to extract actionlint archive."
-                        rm -f "$TEMP_FILE"
+                        echo "❌ Failed to get actionlint download URL after $MAX_RETRIES attempts."
                         return 1
                     fi
-                else
-                    echo "❌ Failed to download actionlint from $LATEST_URL"
-                    rm -f "$TEMP_FILE"
-                    return 1
                 fi
-            else
-                echo "❌ Failed to get actionlint download URL."
-                return 1
-            fi
+                
+                echo "📥 Downloading actionlint from: $LATEST_URL"
+                TEMP_FILE=$(mktemp)
+                
+                if curl -sL "$LATEST_URL" -o "$TEMP_FILE"; then
+                    echo "📦 Extracting actionlint..."
+                    if tar -xzf "$TEMP_FILE" 2>/dev/null; then
+                        rm -f "$TEMP_FILE"
+                        sudo mv actionlint /usr/local/bin/ 2>/dev/null || mv actionlint /usr/local/bin/
+                        echo "✅ actionlint installed via direct download."
+                        return 0
+                    else
+                        echo "⚠️  Failed to extract actionlint archive."
+                        rm -f "$TEMP_FILE"
+                        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                            echo "⏳ Waiting ${RETRY_DELAY} seconds before retry..."
+                            sleep $RETRY_DELAY
+                            continue
+                        else
+                            echo "❌ Failed to extract actionlint archive after $MAX_RETRIES attempts."
+                            return 1
+                        fi
+                    fi
+                else
+                    echo "⚠️  Failed to download actionlint from $LATEST_URL"
+                    rm -f "$TEMP_FILE"
+                    if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                        echo "⏳ Waiting ${RETRY_DELAY} seconds before retry..."
+                        sleep $RETRY_DELAY
+                        continue
+                    else
+                        echo "❌ Failed to download actionlint after $MAX_RETRIES attempts."
+                        return 1
+                    fi
+                fi
+            done
         elif [[ "$OS" == "Darwin" ]]; then
             if command -v brew >/dev/null 2>&1; then
                 brew install actionlint
                 echo "✅ actionlint installed via Homebrew."
             else
-                # Download and install actionlint for macOS
-                LATEST_URL=$(curl -s https://api.github.com/repos/rhysd/actionlint/releases/latest | grep "browser_download_url.*darwin_amd64.tar.gz" | cut -d '"' -f 4)
-                if [ -n "$LATEST_URL" ]; then
-                    curl -sL "$LATEST_URL" | tar -xz
-                    sudo mv actionlint /usr/local/bin/
-                    echo "✅ actionlint installed via direct download."
-                else
-                    echo "❌ Failed to get actionlint download URL."
-                    return 1
-                fi
+                # Download and install actionlint for macOS with retry logic
+                MAX_RETRIES=3
+                RETRY_DELAY=2
+                RETRY_COUNT=0
+                
+                while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+                    RETRY_COUNT=$((RETRY_COUNT + 1))
+                    echo "📥 Attempting to install actionlint (attempt $RETRY_COUNT/$MAX_RETRIES)..."
+                    
+                    LATEST_URL=$(curl -s https://api.github.com/repos/rhysd/actionlint/releases/latest | grep "browser_download_url.*darwin_amd64.tar.gz" | cut -d '"' -f 4)
+                    
+                    if [ -z "$LATEST_URL" ]; then
+                        echo "⚠️  Failed to get actionlint download URL."
+                        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                            echo "⏳ Waiting ${RETRY_DELAY} seconds before retry..."
+                            sleep $RETRY_DELAY
+                            continue
+                        else
+                            echo "❌ Failed to get actionlint download URL after $MAX_RETRIES attempts."
+                            return 1
+                        fi
+                    fi
+                    
+                    echo "📥 Downloading actionlint from: $LATEST_URL"
+                    TEMP_FILE=$(mktemp)
+                    
+                    if curl -sL "$LATEST_URL" -o "$TEMP_FILE"; then
+                        echo "📦 Extracting actionlint..."
+                        if tar -xzf "$TEMP_FILE" 2>/dev/null; then
+                            rm -f "$TEMP_FILE"
+                            sudo mv actionlint /usr/local/bin/ 2>/dev/null || mv actionlint /usr/local/bin/
+                            echo "✅ actionlint installed via direct download."
+                            return 0
+                        else
+                            echo "⚠️  Failed to extract actionlint archive."
+                            rm -f "$TEMP_FILE"
+                            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                                echo "⏳ Waiting ${RETRY_DELAY} seconds before retry..."
+                                sleep $RETRY_DELAY
+                                continue
+                            else
+                                echo "❌ Failed to extract actionlint archive after $MAX_RETRIES attempts."
+                                return 1
+                            fi
+                        fi
+                    else
+                        echo "⚠️  Failed to download actionlint from $LATEST_URL"
+                        rm -f "$TEMP_FILE"
+                        if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                            echo "⏳ Waiting ${RETRY_DELAY} seconds before retry..."
+                            sleep $RETRY_DELAY
+                            continue
+                        else
+                            echo "❌ Failed to download actionlint after $MAX_RETRIES attempts."
+                            return 1
+                        fi
+                    fi
+                done
             fi
         else
             echo "❌ Cannot install actionlint. Please install manually from https://github.com/rhysd/actionlint"
