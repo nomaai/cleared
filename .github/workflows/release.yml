@@ -38,9 +38,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      pull-requests: write
     outputs:
       version: ${{ steps.version_bump.outputs.new_version }}
       version_tag: ${{ steps.version_bump.outputs.version_tag }}
+      release_branch: ${{ steps.commit_version.outputs.release_branch }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -157,6 +159,17 @@ jobs:
       - name: Build distribution packages
         run: |
           echo "Building distribution packages..."
+          
+          # Verify README.md exists (required for PyPI package description)
+          if [ ! -f "README.md" ]; then
+            echo "ERROR: README.md not found in current directory!"
+            echo "Current directory: $(pwd)"
+            echo "Files in current directory:"
+            ls -la
+            exit 1
+          fi
+          echo "README.md found: $(ls -lh README.md)"
+          
           # Verify version before building
           EXPECTED_VERSION="${{ steps.version_bump.outputs.new_version }}"
           if [ -n "${EXPECTED_VERSION}" ]; then
@@ -168,8 +181,28 @@ jobs:
               exit 1
             fi
           fi
+          
+          # Verify pyproject.toml has readme configured
+          if ! grep -q 'readme.*=.*"README.md"' pyproject.toml && \
+             ! grep -q "readme.*=.*'README.md'" pyproject.toml; then
+            echo "WARNING: pyproject.toml may not have readme configured correctly"
+            echo "Checking pyproject.toml for readme:"
+            grep -i readme pyproject.toml || echo "No readme found in pyproject.toml"
+          fi
+          
+          # Build packages
           task build
+          
+          # Verify built packages
           ls -la dist/
+          echo "Checking if README.md is included in source distribution..."
+          for tarball in dist/*.tar.gz; do
+            if [ -f "${tarball}" ]; then
+              tar -tzf "${tarball}" | grep -i readme || \
+                echo "WARNING: README.md not found in source distribution"
+              break
+            fi
+          done
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -179,18 +212,12 @@ jobs:
           retention-days: 7
 
       - name: Commit version changes
+        id: commit_version
         if: github.event_name == 'workflow_dispatch'
         run: |
           git add VERSION pyproject.toml CHANGELOG.md
           git commit -m "chore: bump version to ${{ steps.version_bump.outputs.new_version }}" \
             || echo "No changes to commit"
-          # Always push to default branch (main) to keep version in sync
-          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
-          if [ -z "${DEFAULT_BRANCH}" ]; then
-            DEFAULT_BRANCH="main"
-          fi
-          echo "Pushing version changes to ${DEFAULT_BRANCH} branch..."
-          git push origin HEAD:${DEFAULT_BRANCH} || echo "Nothing to push"
 
       - name: Create and push tag
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'
@@ -208,6 +235,8 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true'
     permissions:
       contents: write
+    outputs:
+      release_created: ${{ steps.set_release_output.outputs.release_created }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -254,6 +283,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
+        id: create_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare-release.outputs.version_tag }}
@@ -264,6 +294,13 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+      
+      - name: Set release created output
+        id: set_release_output
+        if: steps.create_release.outcome == 'success'
+        run: |
+          echo "release_created=true" >> "$GITHUB_OUTPUT"
 
   # Job 3: Publish to PyPI
   publish-pypi:
@@ -350,7 +387,7 @@ jobs:
           fi
           
           # Publish using twine (more reliable for pre-built packages)
-          poetry run twine upload dist/*.whl dist/*.tar.gz || {
+          poetry run twine upload dist/* || {
             echo "Publishing failed. This might be because:"
             echo "  - The version already exists on PyPI"
             echo "  - PyPI API token is invalid"
@@ -360,4 +397,241 @@ jobs:
             exit 1
           }
           echo "Successfully published to PyPI!"
+
+  # Job 4: Create PR after all jobs succeed
+  create-pr:
+    name: "Create Pull Request"
+    needs: [prepare-release, create-release, publish-pypi]
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      always() &&
+      needs.prepare-release.result == 'success' &&
+      (needs.create-release.result == 'success' ) &&
+      (needs.publish-pypi.result == 'success' )
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get default branch name
+          DEFAULT_BRANCH="${{ github.event.repository.default_branch }}"
+          if [ -z "${DEFAULT_BRANCH}" ]; then
+            DEFAULT_BRANCH="main"
+          fi
+          
+          # Get version from prepare-release outputs
+          NEW_VERSION="${{ needs.prepare-release.outputs.version }}"
+          
+          if [ -z "${NEW_VERSION}" ]; then
+            echo "No version found, skipping PR creation"
+            exit 0
+          fi
+          
+          # Create release branch name (same format as before)
+          RELEASE_BRANCH="release/version-${NEW_VERSION}"
+          echo "Creating release branch: ${RELEASE_BRANCH}"
+          
+          # Configure git
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin \
+            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+          
+          # Checkout main branch first
+          git fetch origin ${DEFAULT_BRANCH}
+          git checkout ${DEFAULT_BRANCH}
+          git pull origin ${DEFAULT_BRANCH}
+          
+          # Create and push release branch
+          git checkout -b ${RELEASE_BRANCH}
+          git push origin ${RELEASE_BRANCH} || echo "Failed to push release branch"
+          
+          echo "Creating pull request to merge version bump into ${DEFAULT_BRANCH}..."
+          echo "Release branch: ${RELEASE_BRANCH}"
+          echo "New version: ${NEW_VERSION}"
+          
+          # Create PR with same title format as commit message
+          gh pr create \
+            --base ${DEFAULT_BRANCH} \
+            --head ${RELEASE_BRANCH} \
+            --title "chore: bump version to ${NEW_VERSION}" \
+            --body "Automated version bump to ${NEW_VERSION} as part of release workflow.
+
+          This PR was automatically created after a successful release. All release jobs completed successfully:
+          - ✅ Version bumped and packages built
+          - ✅ GitHub release created
+          - ✅ PyPI package published
+          
+          Please review and merge to update the version on the main branch." \
+            --label "release" \
+            || echo "Failed to create pull request (may already exist)"
+          
+          echo "::notice::Pull request created for version ${NEW_VERSION}. Please merge to update main branch."
+
+  # Job 5: Rollback on failure
+  rollback:
+    name: "Rollback Release"
+    needs: [prepare-release, create-release, publish-pypi]
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      always() &&
+      needs.prepare-release.result == 'success' &&
+      (needs.create-release.result == 'failure' || needs.publish-pypi.result == 'failure')
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        if: needs.publish-pypi.result == 'success'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Poetry
+        if: needs.publish-pypi.result == 'success'
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      
+      - name: Install OS dependencies
+        run: task install-os-deps
+
+      - name: Install dependencies
+        run: task setup-env
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin \
+            https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
+
+      - name: Rollback Git Tag
+        if: |
+          needs.prepare-release.result == 'success' &&
+          (needs.create-release.result == 'failure' || needs.publish-pypi.result == 'failure')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION_TAG="${{ needs.prepare-release.outputs.version_tag }}"
+          
+          if [ -z "${VERSION_TAG}" ]; then
+            echo "No version tag to rollback"
+            exit 0
+          fi
+          
+          echo "Attempting to delete tag: ${VERSION_TAG}"
+          echo "Tag was created successfully in prepare-release, but create-release or publish-pypi failed"
+          
+          # Check if tag exists on remote (it should exist since prepare-release succeeded)
+          git fetch --tags
+          if git rev-parse "refs/tags/${VERSION_TAG}" >/dev/null 2>&1; then
+            echo "Deleting remote tag: ${VERSION_TAG}"
+            git push origin --delete "${VERSION_TAG}" || echo "Failed to delete tag"
+          else
+            echo "Tag ${VERSION_TAG} does not exist on remote (may have been deleted already)"
+          fi
+
+      - name: Rollback GitHub Release
+        if: |
+          (needs.create-release.outputs.release_created == 'true' || 
+           (needs.create-release.result == 'failure' && github.event.inputs.create_release == 'true')) &&
+          (needs.create-release.result == 'failure' || needs.publish-pypi.result == 'failure')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION_TAG="${{ needs.prepare-release.outputs.version_tag }}"
+          
+          if [ -z "${VERSION_TAG}" ]; then
+            echo "No version tag, skipping release deletion"
+            exit 0
+          fi
+          
+          echo "Attempting to delete GitHub release for tag: ${VERSION_TAG}"
+          echo "Release was created successfully in create-release, but create-release or publish-pypi failed"
+          
+          # Check if release exists (it should exist if the step succeeded)
+          if gh release view "${VERSION_TAG}" >/dev/null 2>&1; then
+            echo "Deleting GitHub release: ${VERSION_TAG}"
+            gh release delete "${VERSION_TAG}" --yes || echo "Failed to delete release"
+          else
+            echo "Release ${VERSION_TAG} does not exist (may not have been created or already deleted)"
+          fi
+
+      - name: Rollback PyPI Package
+        if: |
+          needs.publish-pypi.result == 'success' &&
+          needs.create-release.result == 'failure'
+        env:
+          TWINE_USERNAME: __token__
+          TWINE_PASSWORD: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          NEW_VERSION="${{ needs.prepare-release.outputs.version }}"
+          
+          if [ -z "${NEW_VERSION}" ]; then
+            echo "No version found, skipping PyPI rollback"
+            exit 0
+          fi
+          
+          echo "Attempting to yank PyPI package version: ${NEW_VERSION}"
+          echo "PyPI publish succeeded but GitHub release failed. Yanking package to prevent new installs."
+          echo "Note: PyPI does not allow deleting packages, only yanking them."
+          echo "Yanking prevents new installs but keeps existing installations working."
+          
+          # Yank the package version
+          poetry run twine yank cleared==${NEW_VERSION} --yes || {
+            echo "Failed to yank package. This might be because:"
+            echo "  - The package version doesn't exist on PyPI"
+            echo "  - PyPI API token is invalid"
+            echo "  - Network issues"
+            echo ""
+            echo "You may need to manually yank the package on PyPI:"
+            echo "  twine yank cleared==${NEW_VERSION} --yes"
+            exit 1
+          }
+          
+          echo "Successfully yanked cleared==${NEW_VERSION} from PyPI"
+
+      - name: Report Rollback Status
+        run: |
+          echo "::warning::Release rollback completed. Summary:"
+          echo "- Git tag deletion attempted"
+          if [ "${{ needs.create-release.result }}" == "failure" ]; then
+            echo "- GitHub release deletion attempted"
+          fi
+          if [ "${{ needs.publish-pypi.result }}" == "success" ]; then
+            echo "- PyPI package yanked (prevents new installs)"
+          fi
+          echo "- Release branch cleanup attempted"
+          echo ""
+          if [ "${{ needs.publish-pypi.result }}" == "success" ]; then
+            echo "::notice::PyPI package has been yanked. New installations will be blocked,"
+            echo "  but existing installations will continue to work."
+          else
+            echo "::error::Note: PyPI packages cannot be deleted once published."
+            echo "  If the PyPI publish succeeded but other steps failed,"
+            echo "  the package will remain on PyPI."
+            echo "You may need to:"
+            echo "  1. Create a new version to replace the failed release"
+            echo "  2. Document the issue in the release notes"
+            echo "  3. Consider yanking the version on PyPI if needed"
+            echo "     (yanking prevents new installs but keeps existing ones)"
+          fi
 
