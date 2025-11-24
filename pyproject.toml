@@ -1,6 +1,6 @@
 [project]
 name = "cleared"
-version = "0.4.1"
+version = "0.4.2"
 description = "An open-source multi-purpose de-identification library with special support for healthcare applications. Provides robust tools to de-identify multi-table, multimodal datasets while maintaining clinical integrity and research utility."
 authors = [
     {name = "NOMA AI INC."}
