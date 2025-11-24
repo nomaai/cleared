@@ -407,7 +407,7 @@ jobs:
       (needs.create-release.result == 'success' ) &&
       (needs.publish-pypi.result == 'success' )
     permissions:
-      contents: read
+      contents: write
       pull-requests: write
     steps:
       - name: Checkout code
@@ -437,31 +437,68 @@ jobs:
           RELEASE_BRANCH="release/version-${NEW_VERSION}"
           echo "Creating release branch: ${RELEASE_BRANCH}"
           
-          # Configure git
+          # Configure git with proper authentication
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin \
             https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git
           
           # Checkout main branch first
-          git fetch origin ${DEFAULT_BRANCH}
-          git checkout ${DEFAULT_BRANCH}
-          git pull origin ${DEFAULT_BRANCH}
+          git fetch origin "${DEFAULT_BRANCH}"
+          git checkout "${DEFAULT_BRANCH}"
+          git pull origin "${DEFAULT_BRANCH}"
           
-          # Create and push release branch
-          git checkout -b ${RELEASE_BRANCH}
-          git push origin ${RELEASE_BRANCH} || echo "Failed to push release branch"
+          # Create and push release branch with retry
+          git checkout -b "${RELEASE_BRANCH}"
+          
+          # Try to push with retry logic
+          MAX_PUSH_RETRIES=3
+          PUSH_RETRY_COUNT=0
+          PUSH_SUCCESS=false
+          
+          while [ $PUSH_RETRY_COUNT -lt $MAX_PUSH_RETRIES ]; do
+            PUSH_RETRY_COUNT=$((PUSH_RETRY_COUNT + 1))
+            echo "Attempting to push release branch (attempt $PUSH_RETRY_COUNT/$MAX_PUSH_RETRIES)..."
+            
+            if git push origin "${RELEASE_BRANCH}" 2>&1; then
+              PUSH_SUCCESS=true
+              echo "✅ Successfully pushed release branch"
+              break
+            else
+              echo "⚠️  Push failed, retrying..."
+              if [ $PUSH_RETRY_COUNT -lt $MAX_PUSH_RETRIES ]; then
+                sleep 2
+              fi
+            fi
+          done
+          
+          if [ "$PUSH_SUCCESS" = "false" ]; then
+            echo "❌ Failed to push release branch after $MAX_PUSH_RETRIES attempts"
+            echo "Cannot create PR without the branch. Exiting."
+            exit 1
+          fi
           
           echo "Creating pull request to merge version bump into ${DEFAULT_BRANCH}..."
           echo "Release branch: ${RELEASE_BRANCH}"
           echo "New version: ${NEW_VERSION}"
           
           # Create PR with same title format as commit message
-          gh pr create \
-            --base ${DEFAULT_BRANCH} \
-            --head ${RELEASE_BRANCH} \
-            --title "chore: bump version to ${NEW_VERSION}" \
-            --body "Automated version bump to ${NEW_VERSION} as part of release workflow.
+          # Try to add label, but don't fail if label doesn't exist
+          HAS_RELEASE_LABEL=false
+          if gh label list | grep -q "release"; then
+            HAS_RELEASE_LABEL=true
+          else
+            echo "⚠️  'release' label not found, creating PR without label"
+          fi
+          
+          # Build PR creation command with proper quoting
+          PR_CREATED=false
+          if [ "${HAS_RELEASE_LABEL}" = "true" ]; then
+            if gh pr create \
+              --base "${DEFAULT_BRANCH}" \
+              --head "${RELEASE_BRANCH}" \
+              --title "chore: bump version to ${NEW_VERSION}" \
+              --body "Automated version bump to ${NEW_VERSION} as part of release workflow.
 
           This PR was automatically created after a successful release. All release jobs completed successfully:
           - ✅ Version bumped and packages built
@@ -469,10 +506,39 @@ jobs:
           - ✅ PyPI package published
           
           Please review and merge to update the version on the main branch." \
-            --label "release" \
-            || echo "Failed to create pull request (may already exist)"
+              --label release; then
+              PR_CREATED=true
+            fi
+          else
+            if gh pr create \
+              --base "${DEFAULT_BRANCH}" \
+              --head "${RELEASE_BRANCH}" \
+              --title "chore: bump version to ${NEW_VERSION}" \
+              --body "Automated version bump to ${NEW_VERSION} as part of release workflow.
+
+          This PR was automatically created after a successful release. All release jobs completed successfully:
+          - ✅ Version bumped and packages built
+          - ✅ GitHub release created
+          - ✅ PyPI package published
           
-          echo "::notice::Pull request created for version ${NEW_VERSION}. Please merge to update main branch."
+          Please review and merge to update the version on the main branch."; then
+              PR_CREATED=true
+            fi
+          fi
+          
+          if [ "${PR_CREATED}" = "false" ]; then
+            echo "⚠️  Failed to create pull request"
+            echo "Checking if PR already exists..."
+            EXISTING_PR=$(gh pr list --head "${RELEASE_BRANCH}" --json number -q '.[0].number' 2>/dev/null || echo "")
+            if [ -n "${EXISTING_PR}" ]; then
+              echo "✅ PR #${EXISTING_PR} already exists for this branch"
+            else
+              echo "❌ PR creation failed and no existing PR found"
+              exit 1
+            fi
+          else
+            echo "::notice::Pull request created for version ${NEW_VERSION}. Please merge to update main branch."
+          fi
 
   # Job 5: Rollback on failure
   rollback:
