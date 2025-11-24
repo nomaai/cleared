@@ -71,7 +71,7 @@ jobs:
         run: task install-os-deps
 
       - name: Install dependencies
-        run: task setup-env
+        run: task setup-env-ci
 
       - name: Configure Git
         run: |
@@ -335,7 +335,7 @@ jobs:
           virtualenvs-in-project: true
 
       - name: Install dependencies
-        run: task setup-env
+        run: task setup-env-ci
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
@@ -513,7 +513,8 @@ jobs:
           virtualenvs-in-project: true
 
       - name: Install dependencies
-        run: task setup-env
+        if: needs.publish-pypi.result == 'success'
+        run: task setup-env-ci
 
       - name: Configure Git
         run: |
