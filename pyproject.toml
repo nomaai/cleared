@@ -6,7 +6,7 @@ authors = [
     {name = "NOMA AI INC."}
 ]
 license = {text = "Apache-2.0 with Commons Clause restriction"}
-readme = {file = "README.md", content-type = "text/markdown"}
+readme = "README.md"
 requires-python = ">=3.10,<3.14"
 keywords = ["de-identification", "healthcare", "privacy", "data-protection", "hipaa", "gdpr"]
 classifiers = [
