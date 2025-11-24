@@ -74,6 +74,16 @@ tasks:
       - echo 'Environment setup complete!'
       - echo 'You can now run task show'
 
+  setup-env-ci:
+    desc: >
+      Setup Python development environment for CI (without verification).
+      Installs all dependencies without checking for OS-level tools.
+      Use this in CI workflows where OS dependencies are installed separately.
+    cmds:
+      - echo 'Setting up Python environment with Poetry (CI mode)...'
+      - poetry install --with dev
+      - echo 'Python environment setup complete!'
+
   verify-deps:
     desc: >
       Verify required dependencies are installed (private task).
