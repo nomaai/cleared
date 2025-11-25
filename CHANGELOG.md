@@ -4,6 +4,83 @@ Changelog
 
 (unreleased)
 ------------
+- Change upload pypi to rebuild (#50) [salimnoma]
+
+  * Updated PR Creation
+
+  * Bump patch version
+
+  * add build mode to task verify-deps
+
+  * Fixed taskfile to properly pass args mode=build  task verify when running as cmds in taskfile
+
+  * Added task verify-deps-build
+
+  * Updated the workflow to fix the readme.md verification step
+
+  * Updated pypi to fetch the branch for upgrade
+- Revert "Change upload pypi to rebuild (#48)" (#49) [salimnoma]
+
+  This reverts commit 46c5644afa9c3e7a3c0a62d7d0352b550e36493f.
+- Change upload pypi to rebuild (#48) [salimnoma]
+
+  * Updated PR Creation
+
+  * Bump patch version
+
+  * add build mode to task verify-deps
+
+  * Fixed taskfile to properly pass args mode=build  task verify when running as cmds in taskfile
+
+  * Added task verify-deps-build
+
+  * Updated the workflow to fix the readme.md verification step
+- Revert "Change upload pypi to rebuild (#46)" (#47) [salimnoma]
+
+  This reverts commit 4af43a564e5ef8a486b956a48540934d661ef9e5.
+- Change upload pypi to rebuild (#46) [salimnoma]
+
+  * Updated PR Creation
+
+  * Bump patch version
+
+  * add build mode to task verify-deps
+
+  * Fixed taskfile to properly pass args mode=build  task verify when running as cmds in taskfile
+
+  * Added task verify-deps-build
+- Revert "Change upload pypi to rebuild (#44)" (#45) [salimnoma]
+
+  This reverts commit 5ce16b6964af386941d4f3f66e1b9e1ed2bb584e.
+- Change upload pypi to rebuild (#44) [salimnoma]
+
+  * Updated PR Creation
+
+  * Bump patch version
+
+  * add build mode to task verify-deps
+
+  * Fixed taskfile to properly pass args mode=build  task verify when running as cmds in taskfile
+- Revert "Change upload pypi to rebuild (#42)" (#43) [salimnoma]
+
+  This reverts commit 115d5ed23232b78f6dfd7c1d4f5b9b87e3e9fb22.
+- Change upload pypi to rebuild (#42) [salimnoma]
+
+  * Updated PR Creation
+
+  * Bump patch version
+
+  * add build mode to task verify-deps
+- Revert "Change upload pypi to rebuild (#40)" (#41) [salimnoma]
+
+  This reverts commit b0596313c6b133ee0a7ff940df1fcee56aaa7bd9.
+- Change upload pypi to rebuild (#40) [salimnoma]
+
+  * Updated PR Creation
+
+  * Bump patch version
+- Chore: bump version to 0.4.5 (#39) [github-actions[bot], github-
+  actions[bot]]
 - Prevent poetry build to use wrong readme (#38) [salimnoma]
 
   * Updated PR Creation
