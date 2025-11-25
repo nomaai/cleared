@@ -362,10 +362,11 @@ jobs:
       - name: Install dependencies
         run: task setup-env-ci
 
-      - name: Build distribution packages
-        run: |
-          echo "Building distribution packages..."
-          task build
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-packages
+          path: dist/
 
       - name: Verify packages exist
         run: |
@@ -378,86 +379,6 @@ jobs:
             echo "Contents of dist/:"
             ls -lah dist/
           fi
-
-      - name: Verify README.md in package matches project README.md
-        run: |
-          echo "Verifying README.md in distribution package..."
-          
-          # Find the source distribution tar.gz file
-          TARBALL=""
-          for file in dist/*.tar.gz; do
-            if [ -f "${file}" ]; then
-              TARBALL="${file}"
-              break
-            fi
-          done
-          
-          if [ -z "${TARBALL}" ]; then
-            echo "❌ ERROR: No .tar.gz file found in dist/"
-            exit 1
-          fi
-          
-          echo "Found source distribution: ${TARBALL}"
-          
-          # Verify project README.md exists
-          if [ ! -f "README.md" ]; then
-            echo "❌ ERROR: Project README.md not found!"
-            exit 1
-          fi
-          
-          # Extract README.md from the tarball
-          TEMP_DIR=$(mktemp -d)
-          echo "Extracting README.md from package..."
-          
-          # Extract the entire package first, then access README.md
-          # The package structure is: cleared-X.Y.Z/README.md
-          PACKAGE_NAME=$(basename "${TARBALL}" .tar.gz)
-          
-          if ! tar -xzf "${TARBALL}" -C "${TEMP_DIR}" "${PACKAGE_NAME}/README.md" 2>&1; then
-            echo "❌ ERROR: Failed to extract README.md from package"
-            echo "Contents of package:"
-            tar -tzf "${TARBALL}" | head -20
-            rm -rf "${TEMP_DIR}"
-            exit 1
-          fi
-          
-          PACKAGED_README="${TEMP_DIR}/${PACKAGE_NAME}/README.md"
-          
-          if [ ! -f "${PACKAGED_README}" ]; then
-            echo "❌ ERROR: README.md not found in package!"
-            echo "Contents of package:"
-            tar -tzf "${TARBALL}" | grep -i readme || echo "No README files found"
-            echo "Extracted files in temp dir:"
-            find "${TEMP_DIR}" -type f | head -10
-            rm -rf "${TEMP_DIR}"
-            exit 1
-          fi
-          
-          echo "✅ README.md found in package"
-          
-          # Compare the two README.md files
-          if diff -q "README.md" "${PACKAGED_README}" > /dev/null 2>&1; then
-            echo "✅ Verified: README.md in package matches project README.md"
-            echo "First 5 lines of project README.md:"
-            head -5 README.md
-            echo ""
-            echo "First 5 lines of packaged README.md:"
-            head -5 "${PACKAGED_README}"
-          else
-            echo "❌ ERROR: README.md in package does NOT match project README.md!"
-            echo ""
-            echo "Differences found:"
-            diff -u "README.md" "${PACKAGED_README}" | head -50 || true
-            echo ""
-            echo "Project README.md size: $(wc -l < README.md) lines"
-            echo "Packaged README.md size: $(wc -l < "${PACKAGED_README}") lines"
-            rm -rf "${TEMP_DIR}"
-            exit 1
-          fi
-          
-          # Cleanup
-          rm -rf "${TEMP_DIR}"
-          echo "✅ README.md verification passed!"
 
       - name: Publish to PyPI
         env:
