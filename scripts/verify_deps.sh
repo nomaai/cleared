@@ -1,6 +1,16 @@
 #!/bin/bash
 
-echo "Verifying dependencies..."
+# Get mode argument (default: dev)
+MODE="${1:-dev}"
+
+# Validate mode
+if [ "${MODE}" != "dev" ] && [ "${MODE}" != "build" ]; then
+  echo "❌ Error: Invalid mode '${MODE}'. Must be 'dev' or 'build'."
+  echo "Usage: $0 [dev|build]"
+  exit 1
+fi
+
+echo "Verifying dependencies (mode: ${MODE})..."
 
 # Function to check fswatch
 check_fswatch() {
@@ -81,11 +91,23 @@ check_yamllint() {
   return 0
 }
 
-# Check Poetry
+# Always check Poetry (required for both modes)
 if ! check_poetry; then
   exit 1
 fi
 
+# Always check task (required for both modes)
+if ! check_task; then
+  exit 1
+fi
+
+# In build mode, only check Poetry and task
+if [ "${MODE}" = "build" ]; then
+  echo "✅ All required build dependencies are installed!"
+  exit 0
+fi
+
+# In dev mode, check all dependencies
 # Check pre-commit
 if ! check_pre_commit; then
   exit 1
@@ -103,11 +125,6 @@ fi
 
 # Check fswatch
 if ! check_fswatch; then
-  exit 1
-fi
-
-# Check task
-if ! check_task; then
   exit 1
 fi
 
