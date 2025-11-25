@@ -409,7 +409,11 @@ jobs:
           TEMP_DIR=$(mktemp -d)
           echo "Extracting README.md from package..."
           
-          if ! tar -xzf "${TARBALL}" -C "${TEMP_DIR}" --strip-components=1 README.md 2>/dev/null; then
+          # Extract the entire package first, then access README.md
+          # The package structure is: cleared-X.Y.Z/README.md
+          PACKAGE_NAME=$(basename "${TARBALL}" .tar.gz)
+          
+          if ! tar -xzf "${TARBALL}" -C "${TEMP_DIR}" "${PACKAGE_NAME}/README.md" 2>&1; then
             echo "❌ ERROR: Failed to extract README.md from package"
             echo "Contents of package:"
             tar -tzf "${TARBALL}" | head -20
@@ -417,10 +421,14 @@ jobs:
             exit 1
           fi
           
-          if [ ! -f "${TEMP_DIR}/README.md" ]; then
+          PACKAGED_README="${TEMP_DIR}/${PACKAGE_NAME}/README.md"
+          
+          if [ ! -f "${PACKAGED_README}" ]; then
             echo "❌ ERROR: README.md not found in package!"
             echo "Contents of package:"
             tar -tzf "${TARBALL}" | grep -i readme || echo "No README files found"
+            echo "Extracted files in temp dir:"
+            find "${TEMP_DIR}" -type f | head -10
             rm -rf "${TEMP_DIR}"
             exit 1
           fi
@@ -428,21 +436,21 @@ jobs:
           echo "✅ README.md found in package"
           
           # Compare the two README.md files
-          if diff -q "README.md" "${TEMP_DIR}/README.md" > /dev/null 2>&1; then
+          if diff -q "README.md" "${PACKAGED_README}" > /dev/null 2>&1; then
             echo "✅ Verified: README.md in package matches project README.md"
             echo "First 5 lines of project README.md:"
             head -5 README.md
             echo ""
             echo "First 5 lines of packaged README.md:"
-            head -5 "${TEMP_DIR}/README.md"
+            head -5 "${PACKAGED_README}"
           else
             echo "❌ ERROR: README.md in package does NOT match project README.md!"
             echo ""
             echo "Differences found:"
-            diff -u "README.md" "${TEMP_DIR}/README.md" | head -50 || true
+            diff -u "README.md" "${PACKAGED_README}" | head -50 || true
             echo ""
             echo "Project README.md size: $(wc -l < README.md) lines"
-            echo "Packaged README.md size: $(wc -l < "${TEMP_DIR}/README.md") lines"
+            echo "Packaged README.md size: $(wc -l < "${PACKAGED_README}") lines"
             rm -rf "${TEMP_DIR}"
             exit 1
           fi
