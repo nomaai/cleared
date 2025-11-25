@@ -361,6 +361,53 @@ jobs:
 
       - name: Install dependencies
         run: task setup-env-ci
+    
+      - name: Verify version matches prepare-release
+        run: |
+          # Get expected version from prepare-release job outputs
+          EXPECTED_VERSION="${{ needs.prepare-release.outputs.version }}"
+          
+          if [ -z "${EXPECTED_VERSION}" ]; then
+            echo "❌ ERROR: No version found from prepare-release job outputs"
+            exit 1
+          fi
+          
+          echo "Expected version from prepare-release: ${EXPECTED_VERSION}"
+          
+          # Checkout the release branch that was created in prepare-release
+          # This ensures we have the version-bumped code
+          RELEASE_BRANCH="${{ needs.prepare-release.outputs.release_branch }}"
+          if [ -n "${RELEASE_BRANCH}" ]; then
+            echo "Checking out release branch: ${RELEASE_BRANCH}"
+            git fetch origin "${RELEASE_BRANCH}"
+            git checkout "${RELEASE_BRANCH}"
+          else
+            echo "⚠️  No release branch found, using current checkout"
+          fi
+          
+          # Verify version in files matches expected version
+          ACTUAL_VERSION=$(cat VERSION)
+          PYPROJECT_VERSION=$(poetry version --short)
+          
+          echo "VERSION file: ${ACTUAL_VERSION}"
+          echo "pyproject.toml: ${PYPROJECT_VERSION}"
+          echo "Expected: ${EXPECTED_VERSION}"
+          
+          if [ "${ACTUAL_VERSION}" != "${EXPECTED_VERSION}" ]; then
+            echo "❌ ERROR: VERSION file mismatch!"
+            echo "Expected: ${EXPECTED_VERSION}"
+            echo "Actual: ${ACTUAL_VERSION}"
+            exit 1
+          fi
+          
+          if [ "${PYPROJECT_VERSION}" != "${EXPECTED_VERSION}" ]; then
+            echo "❌ ERROR: pyproject.toml version mismatch!"
+            echo "Expected: ${EXPECTED_VERSION}"
+            echo "Actual: ${PYPROJECT_VERSION}"
+            exit 1
+          fi
+          
+          echo "✅ Verified: Version matches prepare-release (${EXPECTED_VERSION})"
 
       - name: Build distribution packages
         run: |
