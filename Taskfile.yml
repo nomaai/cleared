@@ -87,11 +87,10 @@ tasks:
   verify-deps:
     desc: >
       Verify required dependencies are installed (private task).
-      Mode: 'dev' (default) checks all dependencies, 'build' only checks task and poetry.
-      Usage: task verify-deps -- [dev|build]
+      Checks for Poetry, pre-commit, fswatch, and taskfile. Used by other tasks.
     internal: true
     cmds:
-      - ./scripts/verify_deps.sh {{.CLI_ARGS}}
+      - ./scripts/verify_deps.sh
 
   verify-env:
     desc: >
@@ -232,7 +231,7 @@ tasks:
       Build distribution packages (wheel and source distribution).
       Creates dist/ directory with built packages. Run before publishing to PyPI.
     cmds:
-      - task: verify-deps build
+      - task: verify-deps
       - echo "Building distribution packages..."
       - poetry build
       - echo "Build complete! Packages are in dist/"
