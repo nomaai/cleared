@@ -168,7 +168,7 @@ For full license terms, see [LICENSE](LICENSE). For commercial licensing options
 
 > ⚠️ Disclaimer: This library is provided "as is" without warranty of any kind. It is not a certified compliance tool. You are responsible for validating its use in regulated or clinical environments. 
 
-**Read detailed disclaimers [here](disclaime.md)**
+**Read detailed disclaimers [here](DISCLAIMER.md)**
 
 
 
@@ -179,5 +179,5 @@ For full license terms, see [LICENSE](LICENSE). For commercial licensing options
 - [📖 Documentation](https://cleared.readthedocs.io)
 - [📦 PyPI Package](https://pypi.org/project/cleared)
 - [📊 Demo Notebooks](https://github.com/nomaai/cleared/examples)
-- [💬 Issues & Discussions](https://github.com/YOURORG/cleared/issues)
+- [💬 Issues & Discussions](https://github.com/nomaai/cleared/issues)
 
