@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![Cleared Logo](https://raw.githubusercontent.com/nomaai/cleared/refs/heads/main/img/logo.png)
+![Cleared Logo](https://github.com/nomaai/cleared/blob/main/img/logo.png?raw=true)
 
 </div>
 
@@ -25,7 +25,7 @@
 
 <div align="center">
 
-![Cleared Overview System](https://raw.githubusercontent.com/nomaai/cleared/refs/heads/main/img/cleared-overview.png)
+![Cleared Overview System](https://github.com/nomaai/cleared/blob/main/img/cleared-overview.png?raw=true)
 
 </div>
 
@@ -108,7 +108,7 @@ Cleared generates comprehensive HTML reports that make it easy to review configu
 
 <div align="center">
 
-![Cleared Configuration Report](https://raw.githubusercontent.com/nomaai/cleared/refs/heads/main/img/conf-full.png)
+![Cleared Configuration Report](https://github.com/nomaai/cleared/blob/main/img/conf-full.png?raw=true)
 
 </div>
 
