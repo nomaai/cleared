@@ -4,7 +4,7 @@
 from pathlib import Path
 
 # Get version from VERSION file
-_VERSION_FILE = Path(__file__).parent.parent.parent / "VERSION"
+_VERSION_FILE = Path(__file__).parent.parent / "VERSION"
 if _VERSION_FILE.exists():
     __version__ = _VERSION_FILE.read_text().strip()
 else:
@@ -12,7 +12,7 @@ else:
     try:
         import tomllib
 
-        _PYPROJECT = Path(__file__).parent.parent.parent / "pyproject.toml"
+        _PYPROJECT = Path(__file__).parent.parent / "pyproject.toml"
         if _PYPROJECT.exists():
             with open(_PYPROJECT, "rb") as f:
                 _data = tomllib.load(f)
