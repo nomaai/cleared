@@ -16,6 +16,7 @@ from cleared.cli.utils import (
     setup_hydra_config_store,
 )
 from cleared.config.structure import ClearedConfig
+import cleared
 
 
 def register_describe_command(app: typer.Typer) -> None:
@@ -205,7 +206,7 @@ def _prepare_template_data(
     return {
         "config_name": config.name,
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "version": "0.1.0",  # Could be read from pyproject.toml or __version__
+        "version": cleared.__version__,
         "config_file": str(config_path) if config_path else None,
         "overview": {
             "table_count": len(config.tables),
