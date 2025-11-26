@@ -4,6 +4,50 @@ Changelog
 
 (unreleased)
 ------------
+- Fixed formating (#56) [salimnoma]
+
+  * Fixed formating
+
+  * Updated img path in readme.md
+
+  * Changed images back to img tag
+
+  * Fixed formatting
+
+  * Updated poetry lock
+- Improvements to project structure as ppypi package (#55) [salimnoma]
+
+  * fixed project organization
+
+  * Updated Poetry
+
+  * Fixed parent path in path
+- Revert "Fixed project organization as a pypi package" (#54)
+  [salimnoma]
+
+  This reverts commit ac06bdc547932642bcd114d11a65444f94096623.
+- Fixed project organization as a pypi package. [salimnoma]
+
+  * Fixed project organization as a pypi package including __version__
+
+  * Updated Poetry lock file
+- Update release workflow to release branch on failure (#52) [salimnoma]
+
+  * Updated PR Creation
+
+  * Bump patch version
+
+  * add build mode to task verify-deps
+
+  * Fixed taskfile to properly pass args mode=build  task verify when running as cmds in taskfile
+
+  * Added task verify-deps-build
+
+  * Updated the workflow to fix the README.md verification step
+
+  * Updated pypi to fetch the branch for upgrade
+- Chore: bump version to 0.4.6 (#51) [github-actions[bot], github-
+  actions[bot]]
 - Change upload pypi to rebuild (#50) [salimnoma]
 
   * Updated PR Creation
