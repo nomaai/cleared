@@ -1,7 +1,6 @@
 """The root package of the project."""
 
 # Version is read from VERSION file at package root
-import tomllib
 from pathlib import Path
 
 # Import all main components for easy access
@@ -37,9 +36,19 @@ else:
     try:
         _PYPROJECT = Path(__file__).parent.parent / "pyproject.toml"
         if _PYPROJECT.exists():
-            with open(_PYPROJECT, "rb") as f:
-                _data = tomllib.load(f)
-                __version__ = _data["tool"]["poetry"]["version"]
+            # Try tomllib first (Python 3.11+), fallback to tomli (Python 3.10)
+            try:
+                import tomllib
+
+                with open(_PYPROJECT, "rb") as f:
+                    _data = tomllib.load(f)
+            except ImportError:
+                # Python 3.10 fallback
+                import tomli as tomllib
+
+                with open(_PYPROJECT, "rb") as f:
+                    _data = tomllib.load(f)
+            __version__ = _data["tool"]["poetry"]["version"]
         else:
             __version__ = "0.0.0"
     except (ImportError, KeyError):
