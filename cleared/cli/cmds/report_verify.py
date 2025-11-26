@@ -15,7 +15,6 @@ from cleared.cli.cmds.verify.model import (
     VerificationOverview,
     VerificationResult,
 )
-import cleared
 
 
 def register_report_verify_command(app: typer.Typer) -> None:
@@ -152,7 +151,7 @@ def _prepare_template_data(
     return {
         "config_name": verification_result.config_path,
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "version": cleared.__version__,
+        "version": "0.1.0",  # Could be read from pyproject.toml or __version__
         "json_file": str(json_path) if json_path else None,
         "overview": verification_result.overview,
         "tables": verification_result.tables,
