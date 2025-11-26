@@ -8,7 +8,7 @@ site_url: https://github.com/nomaai/cleared
 nav:
   - Overview: index.md
   - Quickstart: quickstart.md
-  - Multi-table De-identification: multi_table_pipeline_config.md
+  - Multi-table De-identification: multi-table-deidentification.md
   - Group-level ID de-identification: group-level-id-deidentification.md
   - Date and Time Shifting: date-and-time-shifting.md
   - Free-text PHI Detection: phi-detection.md
@@ -41,4 +41,4 @@ markdown_extensions:
 
 # Extra configuration
 extra:
-  version: 0.4.6
+  version: 0.1.0
