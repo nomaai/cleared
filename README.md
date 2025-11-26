@@ -1,7 +1,9 @@
 # Cleared
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/nomaai/cleared/main/img/logo.png" alt="Cleared Logo" width="200">
+
+![Cleared Logo](https://raw.githubusercontent.com/nomaai/cleared/refs/heads/main/img/logo.png)
+
 </div>
 
 > Share data for scientific research confidently.
@@ -22,7 +24,9 @@
 
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/nomaai/cleared/main/img/cleared-overview.png" alt="Cleared Overview System" width="100%">
+
+![Cleared Overview System](https://raw.githubusercontent.com/nomaai/cleared/refs/heads/main/img/cleared-overview.png)
+
 </div>
 
 
@@ -103,7 +107,9 @@ cleared report-verify verify-results.json -o verification-report.html
 Cleared generates comprehensive HTML reports that make it easy to review configurations and verification results. These visual reports provide detailed insights into your de-identification pipeline:
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/nomaai/cleared/main/img/conf-full.png" alt="Cleared Configuration Report" width="90%">
+
+![Cleared Configuration Report](https://raw.githubusercontent.com/nomaai/cleared/refs/heads/main/img/conf-full.png)
+
 </div>
 
 The HTML reports include:
