@@ -170,6 +170,9 @@ class ClearedConfig:
     deid_config: DeIDConfig = field(default_factory=DeIDConfig)
     io: ClearedIOConfig = field(default_factory=ClearedIOConfig.default)
     tables: dict[str, TableConfig] = field(default_factory=dict)
+    skip_missing_tables: bool = (
+        True  # If True, skip tables without data files instead of failing
+    )
 
     def to_yaml(self) -> str:
         """Convert the ClearedConfig to a YAML string."""

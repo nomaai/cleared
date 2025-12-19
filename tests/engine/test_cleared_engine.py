@@ -18,6 +18,7 @@ from cleared.config.structure import (
 from cleared.transformers.pipelines import TablePipeline
 from cleared.transformers.registry import TransformerRegistry
 from cleared.transformers.base import Pipeline
+from cleared.io.base import TableNotFoundError
 
 
 class TestClearedEngineInitialization:
@@ -2149,3 +2150,394 @@ class TestClearedEngineReverse:
         # Verify no saving occurred (test mode)
         mock_save_results.assert_not_called()
         mock_save_deid_ref.assert_not_called()
+
+
+class TestClearedEngineSkipMissingTables:
+    """Test ClearedEngine skip_missing_tables functionality."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.valid_io_config = ClearedIOConfig(
+            data=PairedIOConfig(
+                input_config=IOConfig(
+                    io_type="filesystem", configs={"base_path": "/tmp/input"}
+                ),
+                output_config=IOConfig(
+                    io_type="filesystem", configs={"base_path": "/tmp/output"}
+                ),
+            ),
+            deid_ref=PairedIOConfig(
+                input_config=IOConfig(
+                    io_type="filesystem", configs={"base_path": "/tmp/deid_input"}
+                ),
+                output_config=IOConfig(
+                    io_type="filesystem", configs={"base_path": "/tmp/deid_output"}
+                ),
+            ),
+            runtime_io_path="/tmp/runtime",
+        )
+
+        self.valid_deid_config = DeIDConfig(
+            time_shift=TimeShiftConfig(method="random_days", min=-365, max=365)
+        )
+
+    def test_skip_missing_tables_default_true(self):
+        """Test that skip_missing_tables defaults to True."""
+        engine = ClearedEngine(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io_config=self.valid_io_config,
+        )
+
+        assert engine.skip_missing_tables is True
+
+    def test_skip_missing_tables_from_config_default_true(self):
+        """Test that skip_missing_tables defaults to True when loading from config."""
+        config = ClearedConfig(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io=self.valid_io_config,
+            tables={},
+        )
+
+        engine = ClearedEngine.__new__(ClearedEngine)
+        engine._init_from_config(config, None)
+
+        assert engine.skip_missing_tables is True
+
+    def test_skip_missing_tables_from_config_set_false(self):
+        """Test that skip_missing_tables can be set to False via config."""
+        config = ClearedConfig(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io=self.valid_io_config,
+            tables={},
+            skip_missing_tables=False,
+        )
+
+        engine = ClearedEngine.__new__(ClearedEngine)
+        engine._init_from_config(config, None)
+
+        assert engine.skip_missing_tables is False
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    def test_table_not_found_error_without_skip(
+        self, mock_save_results, mock_load_deid_ref
+    ):
+        """Test that TableNotFoundError raises error when skip_missing_tables=False."""
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline = Mock(spec=TablePipeline)
+        mock_pipeline.uid = "missing_table_pipeline"
+        mock_pipeline.transform.side_effect = TableNotFoundError(
+            "Table file not found: /tmp/input/missing_table.csv"
+        )
+
+        # Explicitly set skip_missing_tables=False to test error behavior
+        config = ClearedConfig(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io=self.valid_io_config,
+            tables={},
+            skip_missing_tables=False,
+        )
+
+        engine = ClearedEngine.__new__(ClearedEngine)
+        engine._init_from_config(config, None)
+        engine._pipelines = [mock_pipeline]
+
+        # Should raise an error
+        with pytest.raises(ValueError, match="Table file not found"):
+            engine.run(continue_on_error=False)
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    def test_table_not_found_error_with_skip(
+        self, mock_save_results, mock_load_deid_ref
+    ):
+        """Test that TableNotFoundError is skipped when skip_missing_tables=True."""
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline = Mock(spec=TablePipeline)
+        mock_pipeline.uid = "missing_table_pipeline"
+        mock_pipeline.transform.side_effect = TableNotFoundError(
+            "Table file not found: /tmp/input/missing_table.csv"
+        )
+
+        config = ClearedConfig(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io=self.valid_io_config,
+            tables={},
+            skip_missing_tables=True,
+        )
+
+        engine = ClearedEngine.__new__(ClearedEngine)
+        engine._init_from_config(config, None)
+        engine._pipelines = [mock_pipeline]
+
+        # Should NOT raise an error, should skip
+        result = engine.run(continue_on_error=False)
+
+        assert isinstance(result, Results)
+        assert result.success is True
+        assert "missing_table_pipeline" in result.results
+        assert result.results["missing_table_pipeline"].status == "skipped"
+        assert "Table file not found" in result.results["missing_table_pipeline"].error
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    def test_skip_missing_tables_with_multiple_pipelines(
+        self, mock_save_results, mock_load_deid_ref
+    ):
+        """Test that only missing tables are skipped while others run."""
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline1 = Mock(spec=TablePipeline)
+        mock_pipeline1.uid = "missing_table_pipeline"
+        mock_pipeline1.transform.side_effect = TableNotFoundError(
+            "Table file not found: /tmp/input/missing_table.csv"
+        )
+
+        mock_pipeline2 = Mock(spec=TablePipeline)
+        mock_pipeline2.uid = "existing_table_pipeline"
+        mock_pipeline2.transform.return_value = (pd.DataFrame({"result": [1, 2]}), {})
+
+        mock_pipeline3 = Mock(spec=TablePipeline)
+        mock_pipeline3.uid = "another_missing_pipeline"
+        mock_pipeline3.transform.side_effect = TableNotFoundError(
+            "Table file not found: /tmp/input/another_missing.csv"
+        )
+
+        config = ClearedConfig(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io=self.valid_io_config,
+            tables={},
+            skip_missing_tables=True,
+        )
+
+        engine = ClearedEngine.__new__(ClearedEngine)
+        engine._init_from_config(config, None)
+        engine._pipelines = [mock_pipeline1, mock_pipeline2, mock_pipeline3]
+
+        result = engine.run(continue_on_error=False)
+
+        assert isinstance(result, Results)
+        assert result.success is True
+        assert len(result.results) == 3
+
+        # First pipeline was skipped
+        assert result.results["missing_table_pipeline"].status == "skipped"
+
+        # Second pipeline succeeded
+        assert result.results["existing_table_pipeline"].status == "success"
+
+        # Third pipeline was skipped
+        assert result.results["another_missing_pipeline"].status == "skipped"
+
+        # Execution order should include all pipelines
+        assert result.execution_order == [
+            "missing_table_pipeline",
+            "existing_table_pipeline",
+            "another_missing_pipeline",
+        ]
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    def test_table_not_found_with_continue_on_error_false_no_skip(
+        self, mock_save_results, mock_load_deid_ref
+    ):
+        """Test TableNotFoundError with continue_on_error=False and skip_missing_tables=False."""
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline1 = Mock(spec=TablePipeline)
+        mock_pipeline1.uid = "missing_table_pipeline"
+        mock_pipeline1.transform.side_effect = TableNotFoundError(
+            "Table file not found: /tmp/input/missing_table.csv"
+        )
+
+        mock_pipeline2 = Mock(spec=TablePipeline)
+        mock_pipeline2.uid = "second_pipeline"
+        mock_pipeline2.transform.return_value = (pd.DataFrame({"result": [1, 2]}), {})
+
+        # Explicitly set skip_missing_tables=False to test error behavior
+        config = ClearedConfig(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io=self.valid_io_config,
+            tables={},
+            skip_missing_tables=False,
+        )
+
+        engine = ClearedEngine.__new__(ClearedEngine)
+        engine._init_from_config(config, None)
+        engine._pipelines = [mock_pipeline1, mock_pipeline2]
+
+        # Should raise error and not continue to second pipeline
+        with pytest.raises(ValueError, match="Table file not found"):
+            engine.run(continue_on_error=False)
+
+        # Second pipeline should not have been called
+        mock_pipeline2.transform.assert_not_called()
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    def test_table_not_found_with_continue_on_error_true_no_skip(
+        self, mock_save_results, mock_load_deid_ref
+    ):
+        """Test TableNotFoundError with continue_on_error=True and skip_missing_tables=False."""
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline1 = Mock(spec=TablePipeline)
+        mock_pipeline1.uid = "missing_table_pipeline"
+        mock_pipeline1.transform.side_effect = TableNotFoundError(
+            "Table file not found: /tmp/input/missing_table.csv"
+        )
+
+        mock_pipeline2 = Mock(spec=TablePipeline)
+        mock_pipeline2.uid = "second_pipeline"
+        mock_pipeline2.transform.return_value = (pd.DataFrame({"result": [1, 2]}), {})
+
+        # Explicitly set skip_missing_tables=False to test error behavior
+        config = ClearedConfig(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io=self.valid_io_config,
+            tables={},
+            skip_missing_tables=False,
+        )
+
+        engine = ClearedEngine.__new__(ClearedEngine)
+        engine._init_from_config(config, None)
+        engine._pipelines = [mock_pipeline1, mock_pipeline2]
+
+        # Should not raise error and continue to second pipeline
+        result = engine.run(continue_on_error=True)
+
+        assert isinstance(result, Results)
+        assert result.success is True  # Still True because continue_on_error=True
+
+        # First pipeline has error status (not skipped)
+        assert result.results["missing_table_pipeline"].status == "error"
+
+        # Second pipeline succeeded
+        assert result.results["second_pipeline"].status == "success"
+        mock_pipeline2.transform.assert_called_once()
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    @patch.object(ClearedEngine, "_save_deid_ref_files")
+    def test_skip_missing_tables_in_reverse_mode(
+        self, mock_save_deid_ref, mock_save_results, mock_load_deid_ref
+    ):
+        """Test that skip_missing_tables works in reverse mode."""
+        mock_load_deid_ref.return_value = {}
+
+        mock_pipeline = Mock(spec=TablePipeline)
+        mock_pipeline.uid = "missing_table_pipeline"
+        mock_pipeline.reverse.side_effect = TableNotFoundError(
+            "Table file not found: /tmp/output/missing_table.csv"
+        )
+
+        config = ClearedConfig(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io=self.valid_io_config,
+            tables={},
+            skip_missing_tables=True,
+        )
+
+        engine = ClearedEngine.__new__(ClearedEngine)
+        engine._init_from_config(config, None)
+        engine._pipelines = [mock_pipeline]
+
+        result = engine.run(
+            reverse=True,
+            reverse_output_path="/tmp/reverse_output",
+            continue_on_error=False,
+        )
+
+        assert isinstance(result, Results)
+        assert result.success is True
+        assert result.results["missing_table_pipeline"].status == "skipped"
+
+    @patch.object(ClearedEngine, "_load_initial_deid_ref_dict")
+    @patch.object(ClearedEngine, "_save_results")
+    def test_skip_missing_tables_preserves_deid_ref_dict(
+        self, mock_save_results, mock_load_deid_ref
+    ):
+        """Test that skipped tables don't modify deid_ref_dict."""
+        initial_deid_ref = {"existing_ref": pd.DataFrame({"id": [1, 2, 3]})}
+        mock_load_deid_ref.return_value = initial_deid_ref
+
+        mock_pipeline1 = Mock(spec=TablePipeline)
+        mock_pipeline1.uid = "missing_table_pipeline"
+        mock_pipeline1.transform.side_effect = TableNotFoundError(
+            "Table file not found"
+        )
+
+        mock_pipeline2 = Mock(spec=TablePipeline)
+        mock_pipeline2.uid = "existing_table_pipeline"
+        updated_deid_ref = {
+            "existing_ref": pd.DataFrame({"id": [1, 2, 3]}),
+            "new_ref": pd.DataFrame({"id": [4, 5, 6]}),
+        }
+        mock_pipeline2.transform.return_value = (
+            pd.DataFrame({"result": [1, 2]}),
+            updated_deid_ref,
+        )
+
+        config = ClearedConfig(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io=self.valid_io_config,
+            tables={},
+            skip_missing_tables=True,
+        )
+
+        engine = ClearedEngine.__new__(ClearedEngine)
+        engine._init_from_config(config, None)
+        engine._pipelines = [mock_pipeline1, mock_pipeline2]
+
+        result = engine.run(continue_on_error=False)
+
+        assert isinstance(result, Results)
+        assert result.success is True
+
+        # Verify second pipeline received the initial deid_ref_dict
+        # (not modified by the skipped first pipeline)
+        call_args = mock_pipeline2.transform.call_args
+        assert "existing_ref" in call_args[1]["deid_ref_dict"]
+
+    def test_cleared_config_skip_missing_tables_attribute(self):
+        """Test that ClearedConfig has skip_missing_tables attribute."""
+        # Default value is True
+        config1 = ClearedConfig(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io=self.valid_io_config,
+            tables={},
+        )
+        assert config1.skip_missing_tables is True
+
+        # Explicit True
+        config2 = ClearedConfig(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io=self.valid_io_config,
+            tables={},
+            skip_missing_tables=True,
+        )
+        assert config2.skip_missing_tables is True
+
+        # Explicit False
+        config3 = ClearedConfig(
+            name="test_engine",
+            deid_config=self.valid_deid_config,
+            io=self.valid_io_config,
+            tables={},
+            skip_missing_tables=False,
+        )
+        assert config3.skip_missing_tables is False

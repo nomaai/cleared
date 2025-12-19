@@ -26,6 +26,8 @@ from .config.structure import (
 from .transformers.pipelines import TablePipeline
 from .transformers.base import Pipeline, FilterableTransformer, FormattedDataFrameError
 from .transformers.registry import TransformerRegistry
+from .io.base import TableNotFoundError
+
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -206,16 +208,22 @@ class ClearedEngine:
         return engine
 
     def _setup_and_validate(
-        self, name: str, deid_config: DeIDConfig, io_config: ClearedIOConfig
+        self,
+        name: str,
+        deid_config: DeIDConfig,
+        io_config: ClearedIOConfig,
+        skip_missing_tables: bool = True,
     ) -> None:
         """Set the properties of the engine."""
         logger.debug(f"Setting up engine properties for: {name}")
         self.name = name
         self.deid_config = deid_config
         self.io_config = io_config
+        self.skip_missing_tables = skip_missing_tables
         self.results: dict[str, Any] = {}
         self._uid = f"{name}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         logger.debug(f"Generated engine UID: {self._uid}")
+        logger.debug(f"Skip missing tables: {skip_missing_tables}")
         logger.debug("Validating IO configuration...")
         self._validate_io_config()
         logger.debug("IO configuration validation passed")
@@ -232,7 +240,11 @@ class ClearedEngine:
 
         """
         logger.debug("Initializing engine from configuration")
-        self._setup_and_validate(config.name, config.deid_config, config.io)
+        # Use getattr with default True for backward compatibility with older configs
+        skip_missing = getattr(config, "skip_missing_tables", True)
+        self._setup_and_validate(
+            config.name, config.deid_config, config.io, skip_missing
+        )
         self._registry = (
             registry if registry is not None else TransformerRegistry(use_defaults=True)
         )
@@ -642,6 +654,26 @@ class ClearedEngine:
                     pipeline_uid,
                     "error",
                     error_msg,
+                )
+                return current_deid_ref_dict
+
+        except TableNotFoundError as e:
+            # Handle missing table files - skip if configured, otherwise error
+            error_msg = str(e)
+            if self.skip_missing_tables:
+                logger.warning(
+                    f"  ⏭ Skipping pipeline {pipeline_uid}: table file not found"
+                )
+                results.add_pipeline_result(pipeline_uid, "skipped", error_msg)
+                return current_deid_ref_dict
+            else:
+                # Treat as error
+                results.add_pipeline_result(pipeline_uid, "error", error_msg)
+                if not continue_on_error:
+                    results.set_success(False)
+                    raise ValueError(error_msg) from e
+                logger.warning(
+                    "    Continuing execution despite pipeline failure (continue_on_error=True)"
                 )
                 return current_deid_ref_dict
 

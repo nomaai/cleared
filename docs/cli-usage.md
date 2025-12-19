@@ -411,6 +411,9 @@ The CLI uses YAML configuration files that define your de-identification setup. 
 # Engine name
 name: "my_deid_engine"
 
+# Skip tables that don't have a corresponding file (optional, default: true)
+skip_missing_tables: true
+
 # De-identification configuration
 deid_config:
   time_shift:
@@ -593,6 +596,19 @@ The CLI provides comprehensive error handling:
 ```bash
 # Solution: Use --create-dirs flag
 cleared run config.yaml --create-dirs
+```
+
+**Missing table files:**
+```bash
+# Solution: Enable skip_missing_tables in your configuration
+# This allows the engine to skip tables that don't have a corresponding file
+```
+
+```yaml
+# In your config.yaml
+name: "my_deid_engine"
+skip_missing_tables: false  # Set to false to fail when table files are missing
+# ... rest of configuration
 ```
 
 **Invalid configuration:**

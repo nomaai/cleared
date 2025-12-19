@@ -116,6 +116,17 @@ name: "users_deid_pipeline"
 ```
 This sets the name of the entire de-identification pipeline.
 
+### Skip Missing Tables (Optional)
+```yaml
+skip_missing_tables: true  # Default is true
+```
+When set to `true` (the default), the engine will skip tables that don't have a corresponding input file instead of raising an error. This is useful when:
+- Processing a subset of tables from a larger configuration
+- Running in environments where some optional tables may not exist
+- Incrementally processing data as it becomes available
+
+When a table is skipped, the engine logs a warning and marks the pipeline result as "skipped".
+
 ### De-identification Configuration
 ```yaml
 deid_config:
