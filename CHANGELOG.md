@@ -4,6 +4,13 @@ Changelog
 
 (unreleased)
 ------------
+- Added `skip_missing_tables` configuration option (defaults to `true`) that allows
+  the engine to skip tables that don't have a corresponding input file instead of
+  raising an error. Missing tables are logged with a warning and marked as "skipped"
+  in the results. Set to `false` if you want the engine to fail when a table file
+  is missing. This is useful for multi-table pipelines where some tables may be
+  optional or not yet available.
+
 - Fixed formating (#56) [salimnoma]
 
   * Fixed formating

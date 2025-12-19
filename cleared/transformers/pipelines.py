@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 
 from .base import Pipeline, BaseTransformer
-from ..io import BaseDataLoader
+from ..io import BaseDataLoader, TableNotFoundError
 from ..config.structure import IOConfig, DeIDConfig, PairedIOConfig
 from ..models.verify_models import ColumnComparisonResult
 
@@ -161,6 +161,9 @@ class TablePipeline(Pipeline):
                 with self._create_data_loader(read_config) as data_loader:
                     df = data_loader.read_table(self.table_name, rows_limit=rows_limit)
                 logger.info(f"    Read table '{self.table_name}' ({len(df)} rows)")
+            except TableNotFoundError:
+                # Re-raise TableNotFoundError as-is so engine can detect and skip if configured
+                raise
             except Exception as e:
                 error_msg = f"Failed to read table '{self.table_name}': {e!s}"
                 logger.error(f"    {error_msg}")

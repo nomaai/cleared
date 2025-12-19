@@ -85,6 +85,10 @@ Create `multi_table_config.yaml` that imports other configuration files:
 
 name: "multi_table_deid_pipeline"
 
+# Skip tables that don't have a corresponding file (optional, default: true)
+# Set to false if you want the engine to fail when a table file is missing
+skip_missing_tables: true
+
 # De-identification configuration
 deid_config:
   time_shift:
@@ -580,7 +584,31 @@ The results show:
 1. **Missing dependencies**: Ensure `depends_on` tables are processed first
 2. **Inconsistent UIDs**: Use the same `uid` across related tables
 3. **Missing columns**: Verify all referenced columns exist in the data
-4. **File not found**: Check that input CSV files exist in the correct directory
+4. **File not found**: Check that input CSV files exist in the correct directory, or enable `skip_missing_tables`
+
+### Handling Missing Table Files
+
+When working with multi-table pipelines, you may encounter situations where some table files are not available. By default, Cleared skips tables that don't have a corresponding file and logs a warning. If you want the engine to fail when a table file is missing, you can set `skip_missing_tables: false`:
+
+```yaml
+name: "multi_table_deid_pipeline"
+skip_missing_tables: false  # Fail when table files are missing (default is true)
+
+deid_config:
+  # ... rest of configuration
+```
+
+**The default `skip_missing_tables: true` is useful when:**
+- Processing a subset of tables from a larger configuration
+- Running in environments where some optional tables may not exist
+- Incrementally processing data as it becomes available
+- Development and testing scenarios
+
+**Important notes:**
+- Skipped tables are logged with a warning message
+- Skipped tables are marked as "skipped" in the results
+- Dependent tables will still process if their dependencies are available
+- De-identification reference tables (deid_ref) from skipped tables won't be generated
 
 ### Modular Configuration Issues
 
