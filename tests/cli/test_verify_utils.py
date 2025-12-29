@@ -183,6 +183,10 @@ class TestLoadDataForTable:
         """Test successful data loading."""
         config = self._create_test_config()
         mock_loader = MagicMock()
+        # Mock get_table_paths to return single file Path
+        from pathlib import Path as PathType
+
+        mock_loader.get_table_paths.return_value = PathType("/tmp/data/table1.csv")
         mock_loader.read_table.return_value = pd.DataFrame({"col1": [1, 2]})
         mock_loader_class.return_value = mock_loader
 
@@ -191,13 +195,22 @@ class TestLoadDataForTable:
         assert result is not None
         assert isinstance(result, pd.DataFrame)
         assert "col1" in result.columns
-        mock_loader.read_table.assert_called_once_with("table1")
+        # Verify get_table_paths was called
+        mock_loader.get_table_paths.assert_called_once_with("table1")
+        # Verify read_table was called with segment_path
+        mock_loader.read_table.assert_called_once()
+        call_kwargs = mock_loader.read_table.call_args[1]
+        assert "segment_path" in call_kwargs
 
     @patch("cleared.cli.cmds.verify.utils.FileSystemDataLoader")
     def test_load_failure(self, mock_loader_class):
         """Test data loading failure."""
         config = self._create_test_config()
         mock_loader = MagicMock()
+        # Mock get_table_paths to return Path, but read_table raises exception
+        from pathlib import Path as PathType
+
+        mock_loader.get_table_paths.return_value = PathType("/tmp/data/table1.csv")
         mock_loader.read_table.side_effect = Exception("Load failed")
         mock_loader_class.return_value = mock_loader
 
@@ -243,6 +256,76 @@ class TestLoadDataForTable:
         # Verify default CSV format
         call_args = mock_loader_class.call_args[0][0]
         assert call_args["connection_params"]["file_format"] == "csv"
+
+    @patch("cleared.cli.cmds.verify.utils.FileSystemDataLoader")
+    def test_load_data_for_table_single_file(self, mock_loader_class):
+        """Test load_data_for_table with single file (backward compatibility)."""
+        config = self._create_test_config()
+        mock_loader = MagicMock()
+        # Mock get_table_paths to return single Path
+        from pathlib import Path as PathType
+
+        mock_loader.get_table_paths.return_value = PathType("/tmp/data/table1.csv")
+        mock_loader.read_table.return_value = pd.DataFrame({"col1": [1, 2]})
+        mock_loader_class.return_value = mock_loader
+
+        result = load_data_for_table(config, "table1", Path("/tmp/data"))
+
+        assert result is not None
+        assert isinstance(result, pd.DataFrame)
+        assert "col1" in result.columns
+        # Should call read_table with segment_path
+        mock_loader.read_table.assert_called_once()
+        call_kwargs = mock_loader.read_table.call_args[1]
+        assert "segment_path" in call_kwargs
+
+    @patch("cleared.cli.cmds.verify.utils.FileSystemDataLoader")
+    def test_load_data_for_table_directory(self, mock_loader_class):
+        """Test load_data_for_table with directory of segments."""
+        config = self._create_test_config()
+        mock_loader = MagicMock()
+        # Mock get_table_paths to return list of Paths
+        from pathlib import Path as PathType
+
+        segment_paths = [
+            PathType("/tmp/data/users/segment1.csv"),
+            PathType("/tmp/data/users/segment2.csv"),
+            PathType("/tmp/data/users/segment3.csv"),
+        ]
+        mock_loader.get_table_paths.return_value = segment_paths
+        # Mock read_table to return different data for each segment
+        segment_data = [
+            pd.DataFrame({"id": [1, 2], "name": ["Alice", "Bob"]}),
+            pd.DataFrame({"id": [3, 4], "name": ["Charlie", "Diana"]}),
+            pd.DataFrame({"id": [5, 6], "name": ["Eve", "Frank"]}),
+        ]
+        mock_loader.read_table.side_effect = segment_data
+        mock_loader_class.return_value = mock_loader
+
+        result = load_data_for_table(config, "users", Path("/tmp/data"))
+
+        assert result is not None
+        assert isinstance(result, pd.DataFrame)
+        # Should combine all segments (6 rows total)
+        assert len(result) == 6
+        assert "id" in result.columns
+        assert "name" in result.columns
+        # Should call read_table for each segment
+        assert mock_loader.read_table.call_count == 3
+
+    @patch("cleared.cli.cmds.verify.utils.FileSystemDataLoader")
+    def test_load_data_for_table_empty_directory(self, mock_loader_class):
+        """Test load_data_for_table with empty directory."""
+        config = self._create_test_config()
+        mock_loader = MagicMock()
+        from cleared.io.base import TableNotFoundError
+
+        mock_loader.get_table_paths.side_effect = TableNotFoundError("Empty directory")
+        mock_loader_class.return_value = mock_loader
+
+        result = load_data_for_table(config, "empty_table", Path("/tmp/data"))
+
+        assert result is None
 
     def _create_test_config(self):
         """Create a test ClearedConfig."""

@@ -47,11 +47,19 @@ class TestEdgeCases:
             def _initialize_connection(self):
                 pass
 
-            def read_table(self, table_name: str):
+            def get_table_paths(self, table_name: str):
+                raise NotImplementedError("get_table_paths not implemented")
+
+            def read_table(self, table_name: str, rows_limit=None, segment_path=None):
                 raise NotImplementedError("read_table not implemented")
 
             def write_deid_table(
-                self, df, table_name, if_exists="replace", index=False
+                self,
+                df,
+                table_name,
+                if_exists="replace",
+                index=False,
+                segment_name=None,
             ):
                 raise NotImplementedError("write_deid_table not implemented")
 
@@ -59,6 +67,9 @@ class TestEdgeCases:
         loader = IncompleteDataLoader(config)
 
         # Should raise NotImplementedError for unimplemented abstract methods
+        with pytest.raises(NotImplementedError):
+            loader.get_table_paths("test")
+
         with pytest.raises(NotImplementedError):
             loader.read_table("test")
 
@@ -231,7 +242,7 @@ class TestEdgeCases:
 
             test_df = pd.DataFrame({"id": [1, 2, 3], "name": ["A", "B", "C"]})
 
-            with pytest.raises(WriteError, match="Failed to write table"):
+            with pytest.raises(WriteError, match="Failed to write file"):
                 loader.write_deid_table(test_df, "test_table")
 
             # Restore permissions for cleanup
@@ -264,7 +275,7 @@ class TestEdgeCases:
 
             # Should raise FileFormatError when trying to read corrupted file
             with pytest.raises(
-                FileFormatError, match=r"Failed to read table test_table\.*"
+                FileFormatError, match=r"Failed to read file.*test_table"
             ):
                 loader.read_table("test_table")
 

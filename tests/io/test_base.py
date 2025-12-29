@@ -22,8 +22,14 @@ class ConcreteDataLoader(BaseDataLoader):
         """Mock implementation of connection initialization."""
         self.connection_initialized = True
 
+    def get_table_paths(self, table_name: str):
+        """Mock get table paths - returns single table name as Path."""
+        from pathlib import Path
+
+        return Path(table_name)
+
     def read_table(
-        self, table_name: str, rows_limit: int | None = None
+        self, table_name: str, rows_limit: int | None = None, segment_path=None
     ) -> pd.DataFrame:
         """Mock implementation of read_table."""
         df = pd.DataFrame({"id": [1, 2, 3], "name": ["A", "B", "C"]})
@@ -37,6 +43,7 @@ class ConcreteDataLoader(BaseDataLoader):
         table_name: str,
         if_exists: str = "replace",
         index: bool = False,
+        segment_name: str | None = None,
     ) -> None:
         """Mock implementation of write_deid_table."""
         self.written_data = df
@@ -50,8 +57,17 @@ class CustomDataLoader(BaseDataLoader):
         """Initialize custom connection."""
         self.data = {}  # In-memory storage for example
 
+    def get_table_paths(self, table_name: str):
+        """Mock get table paths - returns single table name as Path."""
+        from pathlib import Path
+        from cleared.io.base import TableNotFoundError
+
+        if table_name not in self.data:
+            raise TableNotFoundError(f"Table {table_name} not found")
+        return Path(table_name)
+
     def read_table(
-        self, table_name: str, rows_limit: int | None = None
+        self, table_name: str, rows_limit: int | None = None, segment_path=None
     ) -> pd.DataFrame:
         """Read from custom data source."""
         if table_name not in self.data:
@@ -68,6 +84,7 @@ class CustomDataLoader(BaseDataLoader):
         table_name: str,
         if_exists: str = "replace",
         index: bool = False,
+        segment_name: str | None = None,
     ) -> None:
         """Write to custom data source."""
         if if_exists == "fail" and table_name in self.data:

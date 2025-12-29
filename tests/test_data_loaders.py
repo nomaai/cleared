@@ -117,13 +117,28 @@ class TestCustomDataLoader:
             def _initialize_connection(self):
                 self.data = {}
 
-            def read_table(self, table_name):
+            def get_table_paths(self, table_name: str):
+                """Get table paths - returns Path for single file."""
+                from pathlib import Path
+
+                if table_name in self.data:
+                    return Path(table_name)
+                raise TableNotFoundError(f"Table {table_name} not found")
+
+            def read_table(
+                self, table_name: str, rows_limit: int | None = None, segment_path=None
+            ):
                 if table_name not in self.data:
                     raise TableNotFoundError(f"Table {table_name} not found")
                 return self.data[table_name]
 
             def write_deid_table(
-                self, df, table_name, if_exists="replace", index=False
+                self,
+                df,
+                table_name,
+                if_exists="replace",
+                index=False,
+                segment_name=None,
             ):
                 self.data[table_name] = df.copy()
 

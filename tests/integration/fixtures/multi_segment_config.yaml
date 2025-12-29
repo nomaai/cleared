@@ -1,0 +1,54 @@
+name: "multi_segment_example"
+deid_config:
+  time_shift:
+    method: "random_days"
+    min: -365
+    max: 365
+io:
+  data:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./test_data"
+        file_format: "csv"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./test_output"
+        file_format: "csv"
+  deid_ref:
+    input_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./test_deid_ref_input"
+    output_config:
+      io_type: "filesystem"
+      configs:
+        base_path: "./test_deid_ref_output"
+  runtime_io_path: "./test_runtime"
+tables:
+  users:
+    name: "users"
+    depends_on: []
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "user_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "user_id"
+            uid: "user_id"
+            description: "User identifier"
+  events:
+    name: "events"
+    depends_on: []
+    transformers:
+      - method: "IDDeidentifier"
+        uid: "event_id_transformer"
+        depends_on: []
+        configs:
+          idconfig:
+            name: "event_id"
+            uid: "event_id"
+            description: "Event identifier"
+

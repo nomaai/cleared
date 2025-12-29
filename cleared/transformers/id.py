@@ -242,6 +242,136 @@ class IDDeidentifier(FilterableTransformer):
             if not reverse
             else deid_ref_dict.get(self.idconfig.uid)
         )
+        self._validate_apply_deid_args(deid_ref_df)
+
+        # Inner join to ensure all values have mappings (raises error if some don't)
+        # Use suffixes to handle overlapping column names (e.g., when both df and deid_ref_df have 'user_id')
+        merged = df.merge(
+            deid_ref_df[[self.idconfig.uid, self.idconfig.deid_uid()]],
+            left_on=self.idconfig.name,
+            right_on=self.idconfig.uid if not reverse else self.idconfig.deid_uid(),
+            how="inner",
+            suffixes=("_left", "_right"),
+        )
+
+        self._validate_merged_table(merged, df)
+
+        # Replace the column values with deidentified/original values
+        merged = self._replace_column_values(merged, reverse)
+
+        # Drop the reference columns that were added during merge
+        columns_to_drop = self._get_columns_to_drop(merged)
+        if len(columns_to_drop) > 0:
+            merged.drop(columns=columns_to_drop, inplace=True)
+
+        # Update the deid_ref_dict with the new/updated deid_ref_df/ unchanged
+        updated_deid_ref_dict = deid_ref_dict.copy()
+        if not reverse:
+            updated_deid_ref_dict[self.idconfig.uid] = deid_ref_df.copy()
+
+        return merged, updated_deid_ref_dict
+
+    def _get_columns_to_drop(self, merged: pd.DataFrame) -> list[str]:
+        """
+        Get list of reference columns to drop from merged DataFrame.
+
+        Handles suffixes that pandas may have added when column names overlap.
+
+        Args:
+            merged: The merged DataFrame after joining with deid_ref_df
+
+        Returns:
+            List of column names to drop
+
+        """
+        columns_to_drop = []
+        deid_col = self.idconfig.deid_uid()
+        if deid_col not in merged.columns:
+            deid_col = f"{self.idconfig.deid_uid()}_right"
+        if deid_col in merged.columns:
+            columns_to_drop.append(deid_col)
+
+        if self.idconfig.uid != self.idconfig.name:
+            uid_col = self.idconfig.uid
+            if uid_col not in merged.columns:
+                uid_col = f"{self.idconfig.uid}_right"
+            if uid_col in merged.columns:
+                columns_to_drop.append(uid_col)
+
+        return columns_to_drop
+
+    def _replace_column_values(
+        self, merged: pd.DataFrame, reverse: bool
+    ) -> pd.DataFrame:
+        """
+        Replace column values with deidentified/original values, handling pandas suffixes.
+
+        Args:
+            merged: The merged DataFrame after joining with deid_ref_df
+            reverse: If True, reverse mode (use uid column). If False, forward mode (use deid_uid column).
+
+        Returns:
+            DataFrame with column values replaced
+
+        Raises:
+            ValueError: If required column not found in merged DataFrame
+
+        """
+        # Handle case where pandas added suffixes due to overlapping column names
+        if not reverse:
+            # Forward mode: use deid_uid column (may have suffix if column name overlaps)
+            deid_col = self.idconfig.deid_uid()
+            if deid_col not in merged.columns:
+                # Try with suffix (pandas adds _right suffix when column names overlap)
+                deid_col = f"{self.idconfig.deid_uid()}_right"
+            if deid_col not in merged.columns:
+                error_msg = f"Column '{self.idconfig.deid_uid()}' not found in merged DataFrame after merge"
+                logger.error(f"Transformer {self.uid} {error_msg}")
+                raise ValueError(error_msg)
+            merged[self.idconfig.name] = merged[deid_col]
+        else:
+            # Reverse mode: use uid column (may have suffix if column name overlaps)
+            uid_col = self.idconfig.uid
+            if uid_col not in merged.columns:
+                # Try with suffix (pandas adds _right suffix when column names overlap)
+                uid_col = f"{self.idconfig.uid}_right"
+            if uid_col not in merged.columns:
+                error_msg = f"Column '{self.idconfig.uid}' not found in merged DataFrame after merge"
+                logger.error(f"Transformer {self.uid} {error_msg}")
+                raise ValueError(error_msg)
+            merged[self.idconfig.name] = merged[uid_col]
+        return merged
+
+    def _validate_merged_table(self, merged: pd.DataFrame, df: pd.DataFrame) -> None:
+        """
+        Validate that the merged table has the same number of rows as the original DataFrame.
+
+        Args:
+            merged: The merged DataFrame after joining with deid_ref_df
+            df: The original DataFrame before merging
+
+        Raises:
+            ValueError: If merged DataFrame has different number of rows than original DataFrame
+
+        """
+        if merged.shape[0] != df.shape[0]:
+            error_msg = (
+                f"Some values in '{self.idconfig.name}' don't have deid mappings"
+            )
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
+
+    def _validate_apply_deid_args(self, deid_ref_df: pd.DataFrame | None) -> None:
+        """
+        Validate that deid_ref_df exists and has required columns.
+
+        Args:
+            deid_ref_df: The de-identification reference DataFrame to validate
+
+        Raises:
+            ValueError: If deid_ref_df is None or missing required columns
+
+        """
         if deid_ref_df is None:
             error_msg = f"De-identification reference not found for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
             logger.error(f"Transformer {self.uid} {error_msg}")
@@ -256,43 +386,6 @@ class IDDeidentifier(FilterableTransformer):
             error_msg = f"UID column '{self.idconfig.uid}' not found in deid_ref_df for transformer {self.uid or 'unnamed'} and identifier {self.idconfig.name}"
             logger.error(f"Transformer {self.uid} {error_msg}")
             raise ValueError(error_msg)
-
-        # Inner join to ensure all values have mappings (raises error if some don't)
-        merged = df.merge(
-            deid_ref_df[[self.idconfig.uid, self.idconfig.deid_uid()]],
-            left_on=self.idconfig.name,
-            right_on=self.idconfig.uid if not reverse else self.idconfig.deid_uid(),
-            how="inner",
-        )
-
-        if merged.shape[0] != df.shape[0]:
-            error_msg = (
-                f"Some values in '{self.idconfig.name}' don't have deid mappings"
-            )
-            logger.error(f"Transformer {self.uid} {error_msg}")
-            raise ValueError(error_msg)
-
-        # Replace the column values with deidentified/original values
-        merged[self.idconfig.name] = (
-            merged[self.idconfig.deid_uid()]
-            if not reverse
-            else merged[self.idconfig.uid]
-        )
-
-        # Drop the reference columns that were added during merge
-        columns_to_drop = [self.idconfig.deid_uid()]
-        if self.idconfig.uid != self.idconfig.name:
-            columns_to_drop.append(self.idconfig.uid)
-
-        if columns_to_drop is not None and len(columns_to_drop) > 0:
-            merged.drop(columns=columns_to_drop, inplace=True)
-
-        # Update the deid_ref_dict with the new/updated deid_ref_df/ unchanged
-        updated_deid_ref_dict = deid_ref_dict.copy()
-        if not reverse:
-            updated_deid_ref_dict[self.idconfig.uid] = deid_ref_df.copy()
-
-        return merged, updated_deid_ref_dict
 
     def _get_and_update_deid_mappings(
         self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]

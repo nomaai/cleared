@@ -15,7 +15,8 @@ from cleared.config.structure import (
     DeIDConfig,
     PairedIOConfig,
 )
-from cleared.io.base import BaseDataLoader
+from cleared.io.base import BaseDataLoader, TableNotFoundError
+from pathlib import Path
 
 
 class MockDataLoader(BaseDataLoader):
@@ -59,21 +60,30 @@ class MockDataLoader(BaseDataLoader):
         """Mock connection initialization."""
         pass
 
+    def get_table_paths(self, table_name: str):
+        """Mock get table paths - supports both single file and segments."""
+        # Check for segments (keys like "table_name/segment1.csv")
+        segments = [Path(k) for k in self.data.keys() if k.startswith(f"{table_name}/")]
+        if segments:
+            return sorted(segments)
+        elif table_name in self.data:
+            return Path(table_name)
+        raise TableNotFoundError(f"Table '{table_name}' not found")
+
     def read_table(
-        self, table_name: str, rows_limit: int | None = None
+        self, table_name: str, rows_limit: int | None = None, segment_path=None
     ) -> pd.DataFrame:
-        """Mock read table."""
+        """Mock read table - supports segment_path."""
         self.read_called = True
         self.last_table_name = table_name
-        if table_name in self.data:
-            df = self.data[table_name].copy()
+        key = str(segment_path) if segment_path else table_name
+        if key in self.data:
+            df = self.data[key].copy()
             if rows_limit is not None:
                 df = df.head(rows_limit)
             return df
         else:
-            from cleared.io.base import TableNotFoundError
-
-            raise TableNotFoundError(f"Table {table_name} not found")
+            raise TableNotFoundError(f"Table {key} not found")
 
     def write_deid_table(
         self,
@@ -81,12 +91,14 @@ class MockDataLoader(BaseDataLoader):
         table_name: str,
         if_exists: str = "replace",
         index: bool = False,
+        segment_name: str | None = None,
     ):
-        """Mock write table."""
+        """Mock write table - supports segment_name."""
         self.write_called = True
         self.last_table_name = table_name
         self.last_df = df.copy()
-        self.data[table_name] = df.copy()
+        key = f"{table_name}/{segment_name}" if segment_name else table_name
+        self.data[key] = df.copy()
 
     def list_tables(self):
         """Mock list tables."""
@@ -165,7 +177,7 @@ class TestIDDeidentifierInPipeline:
 
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    @patch("cleared.io.create_data_loader")
+    @patch("cleared.transformers.pipelines.create_data_loader")
     def test_single_table_single_id_deidentification(self, mock_create_loader):
         """Test IDDeidentifier with one table and one ID column."""
         # Setup mock data loader
@@ -224,7 +236,7 @@ class TestIDDeidentifierInPipeline:
         assert mock_loader.read_called
         assert mock_loader.write_called
 
-    @patch("cleared.io.create_data_loader")
+    @patch("cleared.transformers.pipelines.create_data_loader")
     def test_two_tables_different_id_columns(self, mock_create_loader):
         """Test IDDeidentifier with two tables having different ID columns."""
         # Setup mock data loader
@@ -314,7 +326,7 @@ class TestIDDeidentifierInPipeline:
         assert len(encounter_deid_df) == 5
         assert set(encounter_deid_df["encounter_id"]) == {101, 102, 103, 104, 105}
 
-    @patch("cleared.io.create_data_loader")
+    @patch("cleared.transformers.pipelines.create_data_loader")
     def test_two_tables_same_id_column_partial_overlap(self, mock_create_loader):
         """Test IDDeidentifier with two tables having same ID column but partial overlap."""
         # Create overlapping data
@@ -421,7 +433,7 @@ class TestIDDeidentifierInPipeline:
         assert patients_result[patients_result["patient_id"] == id2_deid].shape[0] > 0
         assert visits_result[visits_result["patient_id"] == id2_deid].shape[0] > 0
 
-    @patch("cleared.io.create_data_loader")
+    @patch("cleared.transformers.pipelines.create_data_loader")
     def test_two_tables_same_uid_different_names(self, mock_create_loader):
         """Test IDDeidentifier with two tables having same UID but different column names."""
         # Create data with different column names but same UID
@@ -522,7 +534,7 @@ class TestIDDeidentifierInPipeline:
         assert patients_result[patients_result["patient_id"] == id1_deid].shape[0] > 0
         assert users_result[users_result["user_id"] == id1_deid].shape[0] > 0
 
-    @patch("cleared.io.create_data_loader")
+    @patch("cleared.transformers.pipelines.create_data_loader")
     def test_single_table_two_id_columns_different_uids(self, mock_create_loader):
         """Test IDDeidentifier with one table having two ID columns with different UIDs."""
         # Setup mock data loader
@@ -602,7 +614,7 @@ class TestIDDeidentifierInPipeline:
         assert len(encounter_deid_df) == 5
         assert set(encounter_deid_df["encounter_id"]) == {101, 102, 103, 104, 105}
 
-    @patch("cleared.io.create_data_loader")
+    @patch("cleared.transformers.pipelines.create_data_loader")
     def test_single_table_two_id_columns_same_uid_overlapping_values(
         self, mock_create_loader
     ):

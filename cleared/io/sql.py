@@ -8,6 +8,7 @@ SQL database data sources (PostgreSQL, MySQL, SQLite, etc.).
 from __future__ import annotations
 
 from typing import Any
+from pathlib import Path
 import pandas as pd
 import sqlalchemy as sa
 from sqlalchemy import create_engine, text
@@ -113,8 +114,33 @@ class SQLDataLoader(BaseDataLoader):
 
         return f"{driver}://{username}:{password}@{host}{port}/{database}"
 
+    def get_table_paths(self, table_name: str) -> Path | list[Path]:
+        """
+        Get path(s) for a table.
+
+        For SQL databases, segments are not supported. This method returns
+        a Path representation of the table name if it exists.
+
+        Args:
+            table_name: Name of the table
+
+        Returns:
+            Path representation of the table name (single table only)
+
+        Raises:
+            TableNotFoundError: If table doesn't exist
+
+        """
+        if not self.table_exists(table_name):
+            raise TableNotFoundError(f"Table '{table_name}' does not exist")
+        # Return a Path-like representation (table name as path)
+        return Path(table_name)
+
     def read_table(
-        self, table_name: str, rows_limit: int | None = None
+        self,
+        table_name: str,
+        rows_limit: int | None = None,
+        segment_path: Path | None = None,
     ) -> pd.DataFrame:
         """
         Read data from a SQL table.
@@ -122,6 +148,7 @@ class SQLDataLoader(BaseDataLoader):
         Args:
             table_name: Name of the table to read from
             rows_limit: Optional limit on number of rows to read (for testing)
+            segment_path: Not supported for SQL (ignored)
 
         Returns:
             DataFrame containing the table data
@@ -135,6 +162,10 @@ class SQLDataLoader(BaseDataLoader):
             # Check if table exists
             if not self.table_exists(table_name):
                 raise TableNotFoundError(f"Table '{table_name}' does not exist")
+
+            # segment_path is not supported for SQL databases
+            if segment_path is not None:
+                raise ValueError("segment_path is not supported for SQL data loaders")
 
             # Build query to read table (with optional limit)
             if rows_limit is not None:
@@ -158,6 +189,7 @@ class SQLDataLoader(BaseDataLoader):
         table_name: str,
         if_exists: str = "replace",
         index: bool = False,
+        segment_name: str | None = None,
     ) -> None:
         """
         Write de-identified data to a SQL table.
@@ -167,11 +199,15 @@ class SQLDataLoader(BaseDataLoader):
             table_name: Name of the table to write to
             if_exists: How to behave if table exists ('replace', 'append', 'fail')
             index: Whether to write DataFrame index as a column
+            segment_name: Not supported for SQL (ignored)
 
         Raises:
             WriteError: If writing fails
 
         """
+        # segment_name is not supported for SQL databases
+        if segment_name is not None:
+            raise ValueError("segment_name is not supported for SQL data loaders")
         try:
             # Validate data before writing
             self.validate_data(df, table_name)

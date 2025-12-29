@@ -37,6 +37,7 @@
 |----------|-------------|
 | ✅ **Multi-table Support** | Consistent ID mapping across EHR tables (e.g. patients, encounters, labs) |
 | ✅ **Multi-ID Support** | Consistent ID mapping across multiple identifiers |
+| ✅ **Multi-Segment Tables** | Automatic detection and processing of tables split across multiple segment files |
 | ⏳ **Data Risk Analysis and Reporting** | Analyzes datasets for possible identfier risk and providers comprehensive report to verify de-id plans and configurations|
 | ✅ **ID Grouping Support** | Supports de-identification of group-level identifiers such as Patient/Person ID or MRN that will be common across multiple unique patient visits or encounters|
 | ✅ **Date & Time Shifting** | De-identify temporal data while preserving clinical event intervals |
