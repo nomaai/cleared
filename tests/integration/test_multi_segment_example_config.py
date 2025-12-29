@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 import pandas as pd
+import shutil
 
 from cleared.engine import ClearedEngine
 from cleared.cli.utils import load_config_from_file
@@ -272,6 +273,12 @@ tables:
         engine = ClearedEngine.from_config(config)
         engine.run()
 
+        # Copy deid_ref files from output to input for reverse operation
+        for deid_ref_file in self.test_deid_ref_output_dir.glob("*.csv"):
+            shutil.copy(
+                deid_ref_file, self.test_deid_ref_input_dir / deid_ref_file.name
+            )
+
         # Run reverse
         reverse_dir = Path(self.temp_dir) / "reversed"
         reverse_dir.mkdir()
@@ -298,6 +305,12 @@ tables:
         config = load_config_from_file(self.config_file)
         engine = ClearedEngine.from_config(config)
         engine.run()
+
+        # Copy deid_ref files from output to input for reverse operation
+        for deid_ref_file in self.test_deid_ref_output_dir.glob("*.csv"):
+            shutil.copy(
+                deid_ref_file, self.test_deid_ref_input_dir / deid_ref_file.name
+            )
 
         # Run reverse
         reverse_dir = Path(self.temp_dir) / "reversed"

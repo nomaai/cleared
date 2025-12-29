@@ -306,7 +306,7 @@ class TestFileSystemDataLoader:
         with open(test_file, "w") as f:
             f.write("a,b,c\n1,2\n3,4,5,6")  # Inconsistent column count
 
-        with pytest.raises(FileFormatError, match="Failed to read table"):
+        with pytest.raises(FileFormatError, match="Failed to read file"):
             loader.read_table("test_table")
 
     def test_write_deid_table_csv_replace(self):
@@ -526,7 +526,7 @@ class TestFileSystemDataLoader:
 
         loader = FileSystemDataLoader(self.config)
 
-        with pytest.raises(WriteError, match="Failed to write table"):
+        with pytest.raises(WriteError, match="Failed to write file"):
             loader.write_deid_table(test_data, "test_table")
 
         # Restore permissions for cleanup

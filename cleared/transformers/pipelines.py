@@ -330,8 +330,12 @@ class TablePipeline(Pipeline):
 
         # If DataFrame is provided, process it directly (no segment detection)
         if df is not None:
+            # Determine output config for single dataframe processing
+            output_config_for_df = (
+                reverse_output_config if reverse else self.io_config.output_config
+            )
             return self._process_single_dataframe(
-                df, deid_ref_dict, test_mode, reverse, reverse_output_config
+                df, deid_ref_dict, test_mode, reverse, output_config_for_df
             )
 
         # Detect table structure

@@ -239,7 +239,7 @@ class TestEdgeCases:
 
             test_df = pd.DataFrame({"id": [1, 2, 3], "name": ["A", "B", "C"]})
 
-            with pytest.raises(WriteError, match="Failed to write table"):
+            with pytest.raises(WriteError, match="Failed to write file"):
                 loader.write_deid_table(test_df, "test_table")
 
             # Restore permissions for cleanup
@@ -272,7 +272,7 @@ class TestEdgeCases:
 
             # Should raise FileFormatError when trying to read corrupted file
             with pytest.raises(
-                FileFormatError, match=r"Failed to read table test_table\.*"
+                FileFormatError, match=r"Failed to read file.*test_table"
             ):
                 loader.read_table("test_table")
 
