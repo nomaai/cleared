@@ -135,8 +135,6 @@ class TestMultiSegmentExampleConfig:
 
     def teardown_method(self):
         """Clean up test environment."""
-        import shutil
-
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def _create_config_file(self):

@@ -68,6 +68,9 @@ class TestEdgeCases:
 
         # Should raise NotImplementedError for unimplemented abstract methods
         with pytest.raises(NotImplementedError):
+            loader.get_table_paths("test")
+
+        with pytest.raises(NotImplementedError):
             loader.read_table("test")
 
         with pytest.raises(NotImplementedError):
