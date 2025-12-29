@@ -604,6 +604,203 @@ class TestFileSystemDataLoader:
         expected = "FileSystemDataLoader(data_source_type='filesystem')"
         assert repr(loader) == expected
 
+    def test_get_table_paths_single_file(self):
+        """Test get_table_paths() returns single Path for existing file."""
+        loader = FileSystemDataLoader(self.config)
+
+        # Create a test CSV file
+        test_data = pd.DataFrame({"id": [1, 2, 3], "name": ["A", "B", "C"]})
+        test_file = Path(self.temp_dir) / "test_table.csv"
+        test_data.to_csv(test_file, index=False)
+
+        # Test get_table_paths returns single Path
+        result = loader.get_table_paths("test_table")
+        assert isinstance(result, Path)
+        assert result == test_file
+
+    def test_get_table_paths_directory(self):
+        """Test get_table_paths() returns list of Paths for directory."""
+        loader = FileSystemDataLoader(self.config)
+
+        # Create directory with segment files
+        table_dir = Path(self.temp_dir) / "users"
+        table_dir.mkdir()
+
+        # Create multiple segment files
+        segment1 = table_dir / "segment1.csv"
+        segment2 = table_dir / "segment2.csv"
+        segment3 = table_dir / "segment3.csv"
+
+        pd.DataFrame({"id": [1, 2], "name": ["A", "B"]}).to_csv(segment1, index=False)
+        pd.DataFrame({"id": [3, 4], "name": ["C", "D"]}).to_csv(segment2, index=False)
+        pd.DataFrame({"id": [5, 6], "name": ["E", "F"]}).to_csv(segment3, index=False)
+
+        # Test get_table_paths returns list of Paths
+        result = loader.get_table_paths("users")
+        assert isinstance(result, list)
+        assert len(result) == 3
+        assert all(isinstance(p, Path) for p in result)
+        assert segment1 in result
+        assert segment2 in result
+        assert segment3 in result
+
+    def test_get_table_paths_not_found(self):
+        """Test TableNotFoundError when neither file nor directory exists."""
+        loader = FileSystemDataLoader(self.config)
+
+        with pytest.raises(TableNotFoundError):
+            loader.get_table_paths("nonexistent_table")
+
+    def test_get_table_paths_empty_directory(self):
+        """Test empty directory raises TableNotFoundError."""
+        loader = FileSystemDataLoader(self.config)
+
+        # Create empty directory
+        table_dir = Path(self.temp_dir) / "empty_table"
+        table_dir.mkdir()
+
+        with pytest.raises(TableNotFoundError, match="contains no files"):
+            loader.get_table_paths("empty_table")
+
+    def test_get_table_paths_file_takes_precedence(self):
+        """Test file takes precedence over directory if both exist."""
+        loader = FileSystemDataLoader(self.config)
+
+        # Create both file and directory with same name
+        test_file = Path(self.temp_dir) / "test_table.csv"
+        pd.DataFrame({"id": [1], "name": ["A"]}).to_csv(test_file, index=False)
+
+        table_dir = Path(self.temp_dir) / "test_table"
+        table_dir.mkdir()
+        segment = table_dir / "segment1.csv"
+        pd.DataFrame({"id": [2], "name": ["B"]}).to_csv(segment, index=False)
+
+        # File should take precedence
+        result = loader.get_table_paths("test_table")
+        assert isinstance(result, Path)
+        assert result == test_file
+
+    def test_read_table_with_segment_path(self):
+        """Test read_table() with segment_path parameter."""
+        loader = FileSystemDataLoader(self.config)
+
+        # Create a segment file directly
+        segment_file = Path(self.temp_dir) / "custom_segment.csv"
+        test_data = pd.DataFrame({"id": [1, 2, 3], "name": ["A", "B", "C"]})
+        test_data.to_csv(segment_file, index=False)
+
+        # Read using segment_path
+        result = loader.read_table("test_table", segment_path=segment_file)
+        pd.testing.assert_frame_equal(result, test_data)
+
+    def test_read_table_with_segment_path_different_format(self):
+        """Test read_table() with segment_path detects format from extension."""
+        loader = FileSystemDataLoader(self.config)
+
+        # Create JSON segment file
+        segment_file = Path(self.temp_dir) / "custom_segment.json"
+        test_data = pd.DataFrame({"id": [1, 2, 3], "name": ["A", "B", "C"]})
+        test_data.to_json(segment_file, orient="records", index=False)
+
+        # Read using segment_path - should detect JSON format
+        result = loader.read_table("test_table", segment_path=segment_file)
+        pd.testing.assert_frame_equal(result, test_data)
+
+    def test_write_deid_table_with_segment_name(self):
+        """Test write_deid_table() with segment_name parameter."""
+        loader = FileSystemDataLoader(self.config)
+
+        test_data = pd.DataFrame({"id": [1, 2, 3], "name": ["A", "B", "C"]})
+
+        # Write with segment_name
+        loader.write_deid_table(test_data, "users", segment_name="segment1.csv")
+
+        # Verify directory structure created
+        output_dir = Path(self.temp_dir) / "users"
+        assert output_dir.exists()
+        assert output_dir.is_dir()
+
+        # Verify segment file created
+        segment_file = output_dir / "segment1.csv"
+        assert segment_file.exists()
+
+        # Verify content
+        read_data = pd.read_csv(segment_file)
+        pd.testing.assert_frame_equal(read_data, test_data)
+
+    def test_write_deid_table_with_segment_name_multiple_segments(self):
+        """Test writing multiple segments to same table directory."""
+        loader = FileSystemDataLoader(self.config)
+
+        segment1_data = pd.DataFrame({"id": [1, 2], "name": ["A", "B"]})
+        segment2_data = pd.DataFrame({"id": [3, 4], "name": ["C", "D"]})
+
+        # Write multiple segments
+        loader.write_deid_table(segment1_data, "users", segment_name="segment1.csv")
+        loader.write_deid_table(segment2_data, "users", segment_name="segment2.csv")
+
+        # Verify both segments exist
+        output_dir = Path(self.temp_dir) / "users"
+        assert (output_dir / "segment1.csv").exists()
+        assert (output_dir / "segment2.csv").exists()
+
+        # Verify contents
+        read1 = pd.read_csv(output_dir / "segment1.csv")
+        read2 = pd.read_csv(output_dir / "segment2.csv")
+        pd.testing.assert_frame_equal(read1, segment1_data)
+        pd.testing.assert_frame_equal(read2, segment2_data)
+
+    def test_detect_file_format_from_path(self):
+        """Test format detection for various extensions."""
+        loader = FileSystemDataLoader(self.config)
+
+        test_cases = [
+            ("file.csv", "csv"),
+            ("file.parquet", "parquet"),
+            ("file.json", "json"),
+            ("file.xlsx", "xlsx"),
+            ("file.xls", "xls"),
+            ("file.pkl", "pickle"),
+            ("file.unknown", "csv"),  # Default fallback
+        ]
+
+        for file_path_str, expected_format in test_cases:
+            file_path = Path(file_path_str)
+            detected_format = loader._detect_file_format_from_path(file_path)
+            assert detected_format == expected_format, f"Failed for {file_path_str}"
+
+    def test_mixed_file_types_in_directory(self):
+        """Test directory with CSV, Parquet, JSON files."""
+        loader = FileSystemDataLoader(self.config)
+
+        # Create directory with mixed file types
+        table_dir = Path(self.temp_dir) / "mixed_table"
+        table_dir.mkdir()
+
+        # Create CSV file
+        csv_file = table_dir / "segment1.csv"
+        csv_data = pd.DataFrame({"id": [1, 2], "name": ["A", "B"]})
+        csv_data.to_csv(csv_file, index=False)
+
+        # Create JSON file
+        json_file = table_dir / "segment2.json"
+        json_data = pd.DataFrame({"id": [3, 4], "name": ["C", "D"]})
+        json_data.to_json(json_file, orient="records", index=False)
+
+        # Get paths - should return all files
+        paths = loader.get_table_paths("mixed_table")
+        assert isinstance(paths, list)
+        assert len(paths) == 2
+        assert csv_file in paths
+        assert json_file in paths
+
+        # Test reading each segment
+        csv_result = loader.read_table("mixed_table", segment_path=csv_file)
+        json_result = loader.read_table("mixed_table", segment_path=json_file)
+
+        pd.testing.assert_frame_equal(csv_result, csv_data)
+        pd.testing.assert_frame_equal(json_result, json_data)
+
 
 class TestFileSystemDataLoaderIntegration:
     """Integration tests for FileSystemDataLoader."""
@@ -764,6 +961,89 @@ class TestFileSystemDataLoaderIntegration:
         expected_data = pd.concat([initial_data, additional_data], ignore_index=True)
 
         pd.testing.assert_frame_equal(final_data, expected_data)
+
+    def test_segment_workflow(self):
+        """Test full workflow with segment directory structure."""
+        config = DictConfig(
+            {
+                "data_source_type": "filesystem",
+                "connection_params": {
+                    "base_path": self.temp_dir,
+                    "file_format": "csv",
+                },
+            }
+        )
+
+        _loader = FileSystemDataLoader(config)
+
+        # Create input directory with segments
+        input_dir = Path(self.temp_dir) / "input"
+        input_dir.mkdir()
+        users_dir = input_dir / "users"
+        users_dir.mkdir()
+
+        # Create multiple segment files
+        segment1_data = pd.DataFrame({"id": [1, 2], "name": ["Alice", "Bob"]})
+        segment2_data = pd.DataFrame({"id": [3, 4], "name": ["Charlie", "Diana"]})
+        segment3_data = pd.DataFrame({"id": [5, 6], "name": ["Eve", "Frank"]})
+
+        segment1_data.to_csv(users_dir / "segment1.csv", index=False)
+        segment2_data.to_csv(users_dir / "segment2.csv", index=False)
+        segment3_data.to_csv(users_dir / "segment3.csv", index=False)
+
+        # Create loader for input directory
+        input_config = DictConfig(
+            {
+                "data_source_type": "filesystem",
+                "connection_params": {
+                    "base_path": str(input_dir),
+                    "file_format": "csv",
+                },
+            }
+        )
+        input_loader = FileSystemDataLoader(input_config)
+
+        # Create output directory
+        output_dir = Path(self.temp_dir) / "output"
+        output_dir.mkdir()
+        output_config = DictConfig(
+            {
+                "data_source_type": "filesystem",
+                "connection_params": {
+                    "base_path": str(output_dir),
+                    "file_format": "csv",
+                },
+            }
+        )
+        output_loader = FileSystemDataLoader(output_config)
+
+        # Read all segments and write them
+        segment_paths = input_loader.get_table_paths("users")
+        assert isinstance(segment_paths, list)
+        assert len(segment_paths) == 3
+
+        for segment_path in segment_paths:
+            segment_data = input_loader.read_table("users", segment_path=segment_path)
+            segment_name = segment_path.name
+            output_loader.write_deid_table(
+                segment_data, "users", segment_name=segment_name
+            )
+
+        # Verify output structure matches input
+        output_users_dir = output_dir / "users"
+        assert output_users_dir.exists()
+        assert output_users_dir.is_dir()
+
+        assert (output_users_dir / "segment1.csv").exists()
+        assert (output_users_dir / "segment2.csv").exists()
+        assert (output_users_dir / "segment3.csv").exists()
+
+        # Verify contents match
+        for segment_path in segment_paths:
+            segment_name = segment_path.name
+            original_data = pd.read_csv(segment_path)
+            output_data = pd.read_csv(output_users_dir / segment_name)
+            pd.testing.assert_frame_equal(original_data, output_data)
 
     def test_table_mapping_functionality(self):
         """Test table mapping functionality in FileSystemDataLoader."""

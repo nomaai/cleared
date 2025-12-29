@@ -39,10 +39,11 @@ New to Cleared? Start here:
 Learn the fundamental concepts:
 
 4. **[Multi-table De-identification](multi_table_pipeline_config.md)** - Handle related tables with consistent de-identification
-5. **[Rerun De-identification with Consistency](rerun_deidentification_consistency.md)** - Maintain consistency when adding new data
-6. **[Reversing De-identification](reverse.md)** - Restore original values from de-identified data
-7. **[Verify De-identification Results](verify-deid-results.md)** - Verify reversed data integrity and generate HTML reports
-8. **[UIDs de-identification](group-level-id-deidentification.md)** - De-identify group-level identifiers
+5. **[Multi-Segment Tables](multi-segment-tables.md)** - Process tables split across multiple segment files
+6. **[Rerun De-identification with Consistency](rerun_deidentification_consistency.md)** - Maintain consistency when adding new data
+7. **[Reversing De-identification](reverse.md)** - Restore original values from de-identified data
+8. **[Verify De-identification Results](verify-deid-results.md)** - Verify reversed data integrity and generate HTML reports
+9. **[UIDs de-identification](group-level-id-deidentification.md)** - De-identify group-level identifiers
 
 ### 🛠️ Reference Guides
 

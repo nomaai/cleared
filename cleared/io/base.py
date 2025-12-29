@@ -7,6 +7,7 @@ both file system and SQL-based data sources for de-identification workflows.
 
 from abc import ABC, abstractmethod
 from typing import Any
+from pathlib import Path
 import pandas as pd
 from omegaconf import DictConfig
 
@@ -132,8 +133,29 @@ class BaseDataLoader(ABC):
         pass
 
     @abstractmethod
+    def get_table_paths(self, table_name: str) -> Path | list[Path]:
+        """
+        Get path(s) for a table.
+
+        Args:
+            table_name: Name of the table
+
+        Returns:
+            - Path: If table_name maps to a single file
+            - list[Path]: If table_name maps to a directory with segment files
+
+        Raises:
+            TableNotFoundError: If table doesn't exist
+
+        """
+        pass
+
+    @abstractmethod
     def read_table(
-        self, table_name: str, rows_limit: int | None = None
+        self,
+        table_name: str,
+        rows_limit: int | None = None,
+        segment_path: Path | None = None,
     ) -> pd.DataFrame:
         """
         Read data from a table.
@@ -141,6 +163,7 @@ class BaseDataLoader(ABC):
         Args:
             table_name: Name of the table to read from
             rows_limit: Optional limit on number of rows to read (for testing)
+            segment_path: Optional path to specific segment file (for multi-segment tables)
 
         Returns:
             DataFrame containing the table data
@@ -160,6 +183,7 @@ class BaseDataLoader(ABC):
         table_name: str,
         if_exists: str = "replace",
         index: bool = False,
+        segment_name: str | None = None,
     ) -> None:
         """
         Write de-identified data to a table.
@@ -169,6 +193,7 @@ class BaseDataLoader(ABC):
             table_name: Name of the table to write to
             if_exists: How to behave if table exists ('replace', 'append', 'fail')
             index: Whether to write DataFrame index as a column
+            segment_name: Optional segment filename (for multi-segment tables)
 
         Raises:
             WriteError: If writing to data source fails

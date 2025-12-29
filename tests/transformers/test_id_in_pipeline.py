@@ -59,21 +59,37 @@ class MockDataLoader(BaseDataLoader):
         """Mock connection initialization."""
         pass
 
+    def get_table_paths(self, table_name: str):
+        """Mock get table paths - supports both single file and segments."""
+        from pathlib import Path as PathType
+        from cleared.io.base import TableNotFoundError
+
+        # Check for segments (keys like "table_name/segment1.csv")
+        segments = [
+            PathType(k) for k in self.data.keys() if k.startswith(f"{table_name}/")
+        ]
+        if segments:
+            return sorted(segments)
+        elif table_name in self.data:
+            return PathType(table_name)
+        raise TableNotFoundError(f"Table '{table_name}' not found")
+
     def read_table(
-        self, table_name: str, rows_limit: int | None = None
+        self, table_name: str, rows_limit: int | None = None, segment_path=None
     ) -> pd.DataFrame:
-        """Mock read table."""
+        """Mock read table - supports segment_path."""
         self.read_called = True
         self.last_table_name = table_name
-        if table_name in self.data:
-            df = self.data[table_name].copy()
+        key = str(segment_path) if segment_path else table_name
+        if key in self.data:
+            df = self.data[key].copy()
             if rows_limit is not None:
                 df = df.head(rows_limit)
             return df
         else:
             from cleared.io.base import TableNotFoundError
 
-            raise TableNotFoundError(f"Table {table_name} not found")
+            raise TableNotFoundError(f"Table {key} not found")
 
     def write_deid_table(
         self,
@@ -81,12 +97,14 @@ class MockDataLoader(BaseDataLoader):
         table_name: str,
         if_exists: str = "replace",
         index: bool = False,
+        segment_name: str | None = None,
     ):
-        """Mock write table."""
+        """Mock write table - supports segment_name."""
         self.write_called = True
         self.last_table_name = table_name
         self.last_df = df.copy()
-        self.data[table_name] = df.copy()
+        key = f"{table_name}/{segment_name}" if segment_name else table_name
+        self.data[key] = df.copy()
 
     def list_tables(self):
         """Mock list tables."""
