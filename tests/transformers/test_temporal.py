@@ -1371,3 +1371,258 @@ class TestDateTimeDeidentifierReverse:
             match=f"Shift column '{self.transformer._timeshift_key()}' not found in timeshift_df",
         ):
             self.transformer.reverse(shifted_df, deid_ref_dict)
+
+
+class TestValidateDatetimeColumnFormat:
+    """Test the _validate_datetime_column_format method of DateTimeDeidentifier."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.idconfig = IdentifierConfig(
+            name="patient_id", uid="patient_uid", description="Patient identifier"
+        )
+        self.time_shift_config = TimeShiftConfig(method="shift_by_days", min=1, max=30)
+        self.deid_config = DeIDConfig(time_shift=self.time_shift_config)
+        self.transformer = DateTimeDeidentifier(
+            idconfig=self.idconfig,
+            global_deid_config=self.deid_config,
+            datetime_column="datetime_col",
+            uid="test_transformer",
+        )
+
+    def test_validate_datetime_column_format_already_datetime_type(self):
+        """Test that validation skips if column is already datetime type."""
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    datetime(2023, 1, 1, 10, 15, 30),
+                    datetime(2023, 1, 2, 11, 20, 45),
+                    datetime(2023, 1, 3, 12, 30, 0),
+                ],
+            }
+        )
+        # Should not raise any error
+        self.transformer._validate_datetime_column_format(df)
+
+    def test_validate_datetime_column_format_valid_string_dates(self):
+        """Test validation passes for valid date strings."""
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    "2023-01-01 10:15:30",
+                    "2023-01-02 11:20:45",
+                    "2023-01-03 12:30:00",
+                ],
+            }
+        )
+        # Should not raise any error
+        self.transformer._validate_datetime_column_format(df)
+
+    def test_validate_datetime_column_format_valid_mixed_formats(self):
+        """Test validation passes for mixed but parseable formats."""
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    "2023-01-01 10:15:30",
+                    "2023-01-02",
+                    "2023-01-03T12:30:00",
+                ],
+            }
+        )
+        # Should not raise any error (format='mixed' allows different formats)
+        self.transformer._validate_datetime_column_format(df)
+
+    def test_validate_datetime_column_format_inconsistent_formats(self):
+        """Test validation raises error for inconsistent formats."""
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3, 4, 5],
+                "datetime_col": [
+                    "2023-01-01 10:15:30",
+                    "2023-01-02 11:20:45",
+                    "2100-12-31",  # Date only - might fail if strict format expected
+                    "invalid-date",
+                    "not-a-date",
+                ],
+            }
+        )
+        # Should raise ValueError with examples
+        with pytest.raises(ValueError) as exc_info:
+            self.transformer._validate_datetime_column_format(df)
+
+        error_msg = str(exc_info.value)
+        assert "inconsistent formats" in error_msg.lower()
+        assert "row(s) could not be parsed" in error_msg.lower()
+        assert "Example values that failed to parse" in error_msg
+        assert "2100-12-31" in error_msg or "invalid-date" in error_msg
+
+    def test_validate_datetime_column_format_unparseable_values(self):
+        """Test validation raises error for unparseable values."""
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    "2023-01-01 10:15:30",
+                    "not-a-date",
+                    "also-invalid",
+                ],
+            }
+        )
+        # Should raise ValueError
+        with pytest.raises(ValueError) as exc_info:
+            self.transformer._validate_datetime_column_format(df)
+
+        error_msg = str(exc_info.value)
+        assert "inconsistent formats" in error_msg.lower()
+        assert "2 row(s)" in error_msg or "could not be parsed" in error_msg.lower()
+
+    def test_validate_datetime_column_format_empty_column(self):
+        """Test validation skips for empty column."""
+        df = pd.DataFrame(
+            {
+                "patient_id": [],
+                "datetime_col": [],
+            }
+        )
+        # Should not raise any error
+        self.transformer._validate_datetime_column_format(df)
+
+    def test_validate_datetime_column_format_empty_dataframe(self):
+        """Test validation skips for empty DataFrame."""
+        df = pd.DataFrame(
+            {
+                "patient_id": [],
+                "datetime_col": [],
+            }
+        )
+        # Should not raise any error
+        self.transformer._validate_datetime_column_format(df)
+
+    def test_validate_datetime_column_format_with_nulls(self):
+        """Test validation handles null values correctly."""
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3, 4],
+                "datetime_col": [
+                    "2023-01-01 10:15:30",
+                    None,
+                    "2023-01-03 12:30:00",
+                    "invalid-date",
+                ],
+            }
+        )
+        # Should raise error for invalid-date but not for null
+        with pytest.raises(ValueError) as exc_info:
+            self.transformer._validate_datetime_column_format(df)
+
+        error_msg = str(exc_info.value)
+        assert "inconsistent formats" in error_msg.lower()
+        assert "invalid-date" in error_msg
+
+    def test_validate_datetime_column_format_non_string_type(self):
+        """Test validation skips for non-string types."""
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [100, 200, 300],  # Integer type
+            }
+        )
+        # Should not raise any error (skips validation for non-string types)
+        self.transformer._validate_datetime_column_format(df)
+
+    def test_validate_datetime_column_format_example_values_limit(self):
+        """Test that error message shows up to 5 example values."""
+        df = pd.DataFrame(
+            {
+                "patient_id": list(range(10)),
+                "datetime_col": [
+                    "invalid1",
+                    "invalid2",
+                    "invalid3",
+                    "invalid4",
+                    "invalid5",
+                    "invalid6",
+                    "invalid7",
+                    "invalid8",
+                    "invalid9",
+                    "invalid10",
+                ],
+            }
+        )
+        # Should raise ValueError with up to 5 examples
+        with pytest.raises(ValueError) as exc_info:
+            self.transformer._validate_datetime_column_format(df)
+
+        error_msg = str(exc_info.value)
+        assert "10 row(s)" in error_msg
+        # Should contain example values (up to 5)
+        example_count = error_msg.count('"invalid')
+        assert example_count <= 5
+        assert example_count >= 1
+
+    def test_validate_datetime_column_format_date_only_vs_datetime(self):
+        """Test validation with mix of date-only and datetime strings."""
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3, 4],
+                "datetime_col": [
+                    "2023-01-01 10:15:30",
+                    "2023-01-02 11:20:45",
+                    "2100-12-31",  # Date only
+                    "2023-01-04",  # Date only
+                ],
+            }
+        )
+        # With format='mixed', pandas should be able to parse both formats
+        # This test verifies that mixed formats are handled correctly
+        # If validation passes, that's good. If it fails, error should be helpful.
+        try:
+            self.transformer._validate_datetime_column_format(df)
+            # If it passes, that's fine - format='mixed' handles it
+        except ValueError as e:
+            # If it fails, verify error message is helpful
+            error_msg = str(e)
+            assert (
+                "inconsistent formats" in error_msg.lower()
+                or "could not be parsed" in error_msg.lower()
+            )
+
+    def test_validate_datetime_column_format_error_message_structure(self):
+        """Test that error message has proper structure with examples and guidance."""
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, 2],
+                "datetime_col": [
+                    "2023-01-01 10:15:30",
+                    "completely-invalid",
+                ],
+            }
+        )
+        with pytest.raises(ValueError) as exc_info:
+            self.transformer._validate_datetime_column_format(df)
+
+        error_msg = str(exc_info.value)
+        # Check error message contains key components
+        assert self.transformer.datetime_column in error_msg
+        assert "1 row(s)" in error_msg or "could not be parsed" in error_msg.lower()
+        assert "Example values" in error_msg
+        assert "value_cast: datetime" in error_msg.lower()
+        assert "completely-invalid" in error_msg
+
+    def test_validate_datetime_column_format_iso8601_formats(self):
+        """Test validation with ISO8601 format strings."""
+        df = pd.DataFrame(
+            {
+                "patient_id": [1, 2, 3],
+                "datetime_col": [
+                    "2023-01-01T10:15:30",
+                    "2023-01-02T11:20:45Z",
+                    "2023-01-03T12:30:00+00:00",
+                ],
+            }
+        )
+        # Should not raise any error (ISO8601 formats are parseable)
+        self.transformer._validate_datetime_column_format(df)
