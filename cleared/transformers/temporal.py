@@ -205,6 +205,9 @@ class DateTimeDeidentifier(FilterableTransformer):
         # Validate input
         self._validate_datetime_deid_args(df)
 
+        # Validate datetime column format
+        self._validate_datetime_column_format(df)
+
         # Handle empty DataFrame
         if len(df) == 0:
             if reverse:
@@ -252,6 +255,83 @@ class DateTimeDeidentifier(FilterableTransformer):
             raise ValueError(error_msg)
         if self.datetime_column not in df.columns:
             error_msg = f"Column '{self.datetime_column}' not found in DataFrame"
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg)
+
+    def _validate_datetime_column_format(self, df: pd.DataFrame) -> None:
+        """
+        Validate that the datetime column has consistent format that can be parsed.
+
+        This validation checks if all values in the datetime column can be successfully
+        parsed as datetime values. It identifies rows with inconsistent formats and provides
+        helpful error messages with examples.
+
+        Args:
+            df: DataFrame to validate
+
+        Raises:
+            ValueError: If datetime column has inconsistent formats or unparseable values
+
+        """
+        datetime_col = df[self.datetime_column]
+
+        # If already datetime type, no need to validate format
+        if pd.api.types.is_datetime64_any_dtype(datetime_col):
+            return
+
+        # If not string/object type, skip format validation
+        if not pd.api.types.is_string_dtype(
+            datetime_col
+        ) and not pd.api.types.is_object_dtype(datetime_col):
+            return
+
+        # Skip validation for empty column
+        if len(datetime_col) == 0:
+            return
+
+        # Try to parse with pandas to_datetime using 'coerce' to identify failures
+        # Using 'mixed' format allows pandas to infer format for each element individually
+        # This will convert unparseable values to NaT
+        try:
+            parsed = pd.to_datetime(datetime_col, errors="coerce", format="mixed")
+        except Exception as e:
+            # If parsing fails entirely, provide a helpful error
+            error_msg = (
+                f"Failed to parse datetime column '{self.datetime_column}': {e!s}\n"
+                f"Please ensure all values in the datetime column have a consistent format, "
+                f"or use 'value_cast: datetime' in your transformer configuration."
+            )
+            logger.error(f"Transformer {self.uid} {error_msg}")
+            raise ValueError(error_msg) from e
+
+        # Find rows that failed to parse (became NaT) but were not originally null
+        original_is_null = datetime_col.isna()
+        parsed_is_null = parsed.isna()
+        failed_to_parse = ~original_is_null & parsed_is_null
+
+        if failed_to_parse.any():
+            failed_count = int(failed_to_parse.sum())
+            failed_indices = datetime_col[failed_to_parse].index.tolist()
+
+            # Get up to 5 example values that failed
+            example_values = datetime_col.loc[failed_indices[:5]].tolist()
+
+            # Build error message
+            error_msg = (
+                f"Datetime column '{self.datetime_column}' contains values with inconsistent formats. "
+                f"{failed_count} row(s) could not be parsed as datetime values."
+            )
+
+            if example_values:
+                example_str = ", ".join([f'"{val}"' for val in example_values])
+                error_msg += f"\nExample values that failed to parse: {example_str}"
+
+            error_msg += (
+                "\n\nTo fix this, ensure all values in the datetime column have a consistent format, "
+                "or use 'value_cast: datetime' in your transformer configuration to allow pandas "
+                "to infer formats automatically."
+            )
+
             logger.error(f"Transformer {self.uid} {error_msg}")
             raise ValueError(error_msg)
 

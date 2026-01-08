@@ -487,6 +487,7 @@ class Pipeline(BaseTransformer):
         self,
         df: pd.DataFrame | None = None,
         deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+        test_mode: bool = False,
     ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
         """
         Transform the data using the transformers in the pipeline.
@@ -494,6 +495,8 @@ class Pipeline(BaseTransformer):
         Args:
             df: Input DataFrame to transform
             deid_ref_dict: Dictionary of De-identification reference DataFrames, keys are the UID of the transformers that created the reference
+            test_mode: If True, suppress transformer logging (for cleaner test output)
+
         Returns:
             Tuple of (transformed_df, updated_deid_ref_dict)
 
@@ -503,14 +506,17 @@ class Pipeline(BaseTransformer):
             return df, deid_ref_dict
 
         if self.sequential_execution:
-            return self._run_sequentially(df, deid_ref_dict, reverse=False)
+            return self._run_sequentially(
+                df, deid_ref_dict, reverse=False, test_mode=test_mode
+            )
         else:
-            return self._transform_in_parallel(df, deid_ref_dict)
+            return self._transform_in_parallel(df, deid_ref_dict, test_mode=test_mode)
 
     def reverse(
         self,
         df: pd.DataFrame | None = None,
         deid_ref_dict: dict[str, pd.DataFrame] | None = None,
+        test_mode: bool = False,
     ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
         """
         Reverse the transformations using the transformers in the pipeline.
@@ -518,6 +524,8 @@ class Pipeline(BaseTransformer):
         Args:
             df: Input DataFrame to reverse
             deid_ref_dict: Dictionary of De-identification reference DataFrames, keys are the UID of the transformers that created the reference
+            test_mode: If True, suppress transformer logging (for cleaner test output)
+
         Returns:
             Tuple of (reversed_df, updated_deid_ref_dict)
 
@@ -527,9 +535,11 @@ class Pipeline(BaseTransformer):
             return df, deid_ref_dict
 
         if self.sequential_execution:
-            return self._run_sequentially(df, deid_ref_dict, reverse=True)
+            return self._run_sequentially(
+                df, deid_ref_dict, reverse=True, test_mode=test_mode
+            )
         else:
-            return self._reverse_in_parallel(df, deid_ref_dict)
+            return self._reverse_in_parallel(df, deid_ref_dict, test_mode=test_mode)
 
     def compare(
         self,
@@ -684,20 +694,23 @@ class Pipeline(BaseTransformer):
         df: pd.DataFrame,
         deid_ref_dict: dict[str, pd.DataFrame],
         reverse: bool = False,
+        test_mode: bool = False,
     ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
         """Run the transformers in the pipeline in sequence."""
         mode = "reverse" if reverse else "transform"
-        logger.info(
-            f"    Running {len(self.__transformers)} transformer(s) sequentially in {mode} mode"
-        )
+        if not test_mode:
+            logger.info(
+                f"    Running {len(self.__transformers)} transformer(s) sequentially in {mode} mode"
+            )
         result_df = df
         transformers = (
             self.__transformers if not reverse else reversed(self.__transformers)
         )
         for idx, transformer in enumerate(transformers):
-            logger.info(
-                f"      → Transformer {idx + 1}/{len(self.__transformers)}: {transformer.uid}"
-            )
+            if not test_mode:
+                logger.info(
+                    f"      → Transformer {idx + 1}/{len(self.__transformers)}: {transformer.uid}"
+                )
             try:
                 if not reverse:
                     result_df, deid_ref_dict = transformer.transform(
@@ -741,28 +754,40 @@ class Pipeline(BaseTransformer):
             raise ValueError("De-identification reference dictionary is required")
 
     def _reverse_in_parallel(
-        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+        self,
+        df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame],
+        test_mode: bool = False,
     ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
         """Reverse the data using the transformers in the pipeline in parallel (reverse topological order)."""
-        return self._run_in_parallel(df, deid_ref_dict, reverse=True)
+        return self._run_in_parallel(
+            df, deid_ref_dict, reverse=True, test_mode=test_mode
+        )
 
     def _transform_in_parallel(
-        self, df: pd.DataFrame, deid_ref_dict: dict[str, pd.DataFrame]
+        self,
+        df: pd.DataFrame,
+        deid_ref_dict: dict[str, pd.DataFrame],
+        test_mode: bool = False,
     ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
         """Transform the data using the transformers in the pipeline in parallel."""
-        return self._run_in_parallel(df, deid_ref_dict, reverse=False)
+        return self._run_in_parallel(
+            df, deid_ref_dict, reverse=False, test_mode=test_mode
+        )
 
     def _run_in_parallel(
         self,
         df: pd.DataFrame,
         deid_ref_dict: dict[str, pd.DataFrame],
         reverse: bool = False,
+        test_mode: bool = False,
     ) -> tuple[pd.DataFrame, dict[str, pd.DataFrame]]:
         """Run the transformers in the pipeline in parallel."""
         mode = "reverse" if reverse else "transform"
-        logger.info(
-            f"    Running {len(self.__transformers)} transformer(s) in parallel ({mode} mode)"
-        )
+        if not test_mode:
+            logger.info(
+                f"    Running {len(self.__transformers)} transformer(s) in parallel ({mode} mode)"
+            )
         # Build and execute DAG
         graph = nx.DiGraph()
         transformer_map = {tf.uid: tf for tf in self.__transformers}
@@ -780,9 +805,10 @@ class Pipeline(BaseTransformer):
 
         logger.debug(f"    Execution order: {[tf.uid for tf in ordered_transformers]}")
         for idx, transformer in enumerate(ordered_transformers):
-            logger.info(
-                f"      → Transformer {idx + 1}/{len(ordered_transformers)}: {transformer.uid}"
-            )
+            if not test_mode:
+                logger.info(
+                    f"      → Transformer {idx + 1}/{len(ordered_transformers)}: {transformer.uid}"
+                )
             try:
                 if not reverse:
                     df, deid_ref_dict = transformer.transform(df, deid_ref_dict)

@@ -107,13 +107,22 @@ class TablePipeline(Pipeline):
             df = data_loader.read_table(
                 self.table_name, rows_limit=rows_limit, segment_path=segment_path
             )
-        logger.debug(f"    Read segment ({len(df)} rows)")
+        if segment_name:
+            logger.info(f"        Read segment '{segment_name}' ({len(df)} rows)")
+        else:
+            logger.debug(f"    Read segment ({len(df)} rows)")
 
         # Process with base pipeline (use reverse() if in reverse mode)
         if reverse:
-            df, deid_ref_dict = super().reverse(df, deid_ref_dict)
+            df, deid_ref_dict = super().reverse(df, deid_ref_dict, test_mode=test_mode)
         else:
-            df, deid_ref_dict = super().transform(df, deid_ref_dict)
+            df, deid_ref_dict = super().transform(
+                df, deid_ref_dict, test_mode=test_mode
+            )
+
+        # Log segment completion in test mode
+        if test_mode and segment_name:
+            logger.info(f"        Completed segment '{segment_name}' ({len(df)} rows)")
 
         # Write segment if not in test mode
         if not test_mode and output_config is not None:
@@ -121,7 +130,10 @@ class TablePipeline(Pipeline):
                 data_loader.write_deid_table(
                     df, self.table_name, segment_name=segment_name
                 )
-            logger.debug(f"    Wrote segment ({len(df)} rows)")
+            if segment_name:
+                logger.info(f"        Wrote segment '{segment_name}' ({len(df)} rows)")
+            else:
+                logger.debug(f"    Wrote segment ({len(df)} rows)")
 
         return df, deid_ref_dict
 
@@ -279,8 +291,11 @@ class TablePipeline(Pipeline):
 
         # Process each segment
         all_dataframes = []
-        for segment_path in segment_paths:
+        for idx, segment_path in enumerate(segment_paths):
             segment_name = segment_path.name
+            logger.info(
+                f"      Processing segment {idx + 1}/{len(segment_paths)}: {segment_name}"
+            )
             try:
                 segment_df, deid_ref_dict = self._transform_segment(
                     segment_path,
@@ -393,9 +408,13 @@ class TablePipeline(Pipeline):
         # Process with base pipeline (use reverse() if in reverse mode)
         try:
             if reverse:
-                df, deid_ref_dict = super().reverse(df, deid_ref_dict)
+                df, deid_ref_dict = super().reverse(
+                    df, deid_ref_dict, test_mode=test_mode
+                )
             else:
-                df, deid_ref_dict = super().transform(df, deid_ref_dict)
+                df, deid_ref_dict = super().transform(
+                    df, deid_ref_dict, test_mode=test_mode
+                )
         except (ValueError, KeyError, AttributeError) as e:
             self._handle_dataframe_error(e)
 
