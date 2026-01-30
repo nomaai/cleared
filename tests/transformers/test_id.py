@@ -1143,3 +1143,398 @@ class TestIDDeidentifierReverse:
             updated_deid_ref_dict[self.idconfig.uid],
             original_deid_ref_dict[self.idconfig.uid],
         )
+
+
+class TestIDDeidentifierValidateMergedTable:
+    """Comprehensive tests for _validate_merged_table and its helper functions."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.idconfig = IdentifierConfig(name="patient_id", uid="patient_uid")
+        self.transformer = IDDeidentifier(self.idconfig)
+
+    def test_check_row_count_match_equal(self):
+        """Test _check_row_count_match returns True when counts match."""
+        assert self.transformer._check_row_count_match(5, 5) is True
+        assert self.transformer._check_row_count_match(0, 0) is True
+        assert self.transformer._check_row_count_match(100, 100) is True
+
+    def test_check_row_count_match_different(self):
+        """Test _check_row_count_match returns False when counts differ."""
+        assert self.transformer._check_row_count_match(5, 3) is False
+        assert self.transformer._check_row_count_match(3, 5) is False
+        assert self.transformer._check_row_count_match(0, 1) is False
+
+    def test_get_missing_values_from_merge(self):
+        """Test _get_missing_values_from_merge identifies missing values."""
+        df = pd.DataFrame({"patient_id": [1, 2, 3, 4, 5]})
+        merged = pd.DataFrame({"patient_id": [1, 2, 3]})
+
+        missing = self.transformer._get_missing_values_from_merge(
+            merged, df, "patient_id"
+        )
+
+        assert missing == {4, 5}
+
+    def test_get_missing_values_from_merge_no_missing(self):
+        """Test _get_missing_values_from_merge returns empty set when no missing."""
+        df = pd.DataFrame({"patient_id": [1, 2, 3]})
+        merged = pd.DataFrame({"patient_id": [1, 2, 3]})
+
+        missing = self.transformer._get_missing_values_from_merge(
+            merged, df, "patient_id"
+        )
+
+        assert missing == set()
+
+    def test_get_missing_values_from_merge_with_nan(self):
+        """Test _get_missing_values_from_merge handles NaN values."""
+        df = pd.DataFrame({"patient_id": [1, 2, np.nan, 4]})
+        merged = pd.DataFrame({"patient_id": [1, 2]})
+
+        missing = self.transformer._get_missing_values_from_merge(
+            merged, df, "patient_id"
+        )
+
+        # NaN values should be excluded
+        assert missing == {4}
+
+    def test_check_type_mismatch_different_types(self):
+        """Test _check_type_mismatch detects type mismatches."""
+        df = pd.DataFrame({"patient_id": ["1", "2", "3"]})  # String type
+        deid_map = pd.DataFrame({"patient_uid": [1, 2, 3]})  # Integer type
+
+        assert (
+            self.transformer._check_type_mismatch(
+                df, deid_map, "patient_id", "patient_uid"
+            )
+            is True
+        )
+
+    def test_check_type_mismatch_same_types(self):
+        """Test _check_type_mismatch returns False when types match."""
+        df = pd.DataFrame({"patient_id": [1, 2, 3]})  # Integer type
+        deid_map = pd.DataFrame({"patient_uid": [1, 2, 3]})  # Integer type
+
+        assert (
+            self.transformer._check_type_mismatch(
+                df, deid_map, "patient_id", "patient_uid"
+            )
+            is False
+        )
+
+    def test_build_type_mismatch_error(self):
+        """Test _build_type_mismatch_error creates proper error message."""
+        error_msg = self.transformer._build_type_mismatch_error(
+            df_col="patient_id",
+            deid_map_col="patient_uid",
+            df_col_dtype=pd.StringDtype(),
+            deid_map_dtype=pd.Int64Dtype(),
+            missing_count=2,
+            missing_values={4, 5},
+        )
+
+        assert "Some values in 'patient_id' don't have deid mappings" in error_msg
+        assert "2 row(s) were lost" in error_msg
+        assert "type mismatch" in error_msg
+        assert "patient_id" in error_msg
+        assert "patient_uid" in error_msg
+        assert "value_cast" in error_msg
+        assert "4" in error_msg or "5" in error_msg  # Sample values
+
+    def test_build_missing_mappings_error(self):
+        """Test _build_missing_mappings_error creates proper error message."""
+        error_msg = self.transformer._build_missing_mappings_error(
+            df_col="patient_id", missing_count=3, missing_values={10, 20, 30}
+        )
+
+        assert "Some values in 'patient_id' don't have deid mappings" in error_msg
+        assert "3 row(s) were lost" in error_msg
+        assert "Missing values (sample)" in error_msg
+
+    def test_check_duplicates_in_deid_map_with_duplicates(self):
+        """Test _check_duplicates_in_deid_map detects duplicates."""
+        deid_map = pd.DataFrame({"patient_uid": [1, 2, 2, 3, 3, 3]})
+
+        has_duplicates, duplicates = self.transformer._check_duplicates_in_deid_map(
+            deid_map, "patient_uid"
+        )
+
+        assert has_duplicates is True
+        assert 2 in duplicates
+        assert 3 in duplicates
+        assert len(duplicates) <= 5  # Sample limit
+
+    def test_check_duplicates_in_deid_map_no_duplicates(self):
+        """Test _check_duplicates_in_deid_map returns False when no duplicates."""
+        deid_map = pd.DataFrame({"patient_uid": [1, 2, 3, 4, 5]})
+
+        has_duplicates, duplicates = self.transformer._check_duplicates_in_deid_map(
+            deid_map, "patient_uid"
+        )
+
+        assert has_duplicates is False
+        assert duplicates == []
+
+    def test_check_duplicates_in_dataframe_with_duplicates(self):
+        """Test _check_duplicates_in_dataframe detects duplicates."""
+        df = pd.DataFrame({"patient_id": [1, 1, 2, 2, 3]})
+
+        has_duplicates, duplicates = self.transformer._check_duplicates_in_dataframe(
+            df, "patient_id"
+        )
+
+        assert has_duplicates is True
+        assert 1 in duplicates
+        assert 2 in duplicates
+
+    def test_check_duplicates_in_dataframe_no_duplicates(self):
+        """Test _check_duplicates_in_dataframe returns False when no duplicates."""
+        df = pd.DataFrame({"patient_id": [1, 2, 3, 4, 5]})
+
+        has_duplicates, duplicates = self.transformer._check_duplicates_in_dataframe(
+            df, "patient_id"
+        )
+
+        assert has_duplicates is False
+        assert duplicates == []
+
+    def test_build_duplicate_deid_map_error(self):
+        """Test _build_duplicate_deid_map_error creates proper error message."""
+        error_msg = self.transformer._build_duplicate_deid_map_error(
+            extra_count=2,
+            deid_map_col="patient_uid",
+            df_col="patient_id",
+            duplicates=[1, 2],
+        )
+
+        assert "Merge resulted in 2 extra row(s)" in error_msg
+        assert "duplicate values in the deid_map" in error_msg
+        assert "patient_uid" in error_msg
+        assert "patient_id" in error_msg
+
+    def test_build_duplicate_dataframe_error(self):
+        """Test _build_duplicate_dataframe_error creates proper error message."""
+        error_msg = self.transformer._build_duplicate_dataframe_error(
+            extra_count=3, df_col="patient_id", duplicate_values=[10, 20]
+        )
+
+        assert "Merge resulted in 3 extra row(s)" in error_msg
+        assert "duplicate values in 'patient_id'" in error_msg
+
+    def test_build_unexpected_extra_rows_error(self):
+        """Test _build_unexpected_extra_rows_error creates proper error message."""
+        error_msg = self.transformer._build_unexpected_extra_rows_error(extra_count=5)
+
+        assert "Merge resulted in 5 extra row(s)" in error_msg
+        assert "unexpected" in error_msg
+
+    def test_validate_merged_table_success(self):
+        """Test _validate_merged_table passes when row counts match."""
+        df = pd.DataFrame({"patient_id": [1, 2, 3]})
+        merged = pd.DataFrame({"patient_id": [1, 2, 3]})
+        deid_map = pd.DataFrame(
+            {"patient_uid": [1, 2, 3], "patient_uid__deid": [10, 20, 30]}
+        )
+
+        # Should not raise an error
+        self.transformer._validate_merged_table(merged, df, deid_map)
+
+    def test_validate_merged_table_fewer_rows_type_mismatch(self):
+        """Test _validate_merged_table raises error for fewer rows with type mismatch."""
+        # DataFrame has string IDs
+        df = pd.DataFrame({"patient_id": ["1", "2", "3", "4"]})
+        # Merged only has 2 rows due to type mismatch
+        merged = pd.DataFrame({"patient_id": ["1", "2"]})
+        # deid_map has integer IDs
+        deid_map = pd.DataFrame(
+            {"patient_uid": [1, 2, 3, 4], "patient_uid__deid": [10, 20, 30, 40]}
+        )
+
+        with pytest.raises(
+            ValueError, match="Some values in 'patient_id' don't have deid mappings"
+        ):
+            self.transformer._validate_merged_table(merged, df, deid_map)
+
+    def test_validate_merged_table_fewer_rows_missing_mappings(self):
+        """Test _validate_merged_table raises error for fewer rows with missing mappings."""
+        df = pd.DataFrame({"patient_id": [1, 2, 3, 4, 5]})
+        # Merged only has 3 rows (missing mappings for 4 and 5)
+        merged = pd.DataFrame({"patient_id": [1, 2, 3]})
+        # deid_map only has mappings for 1, 2, 3
+        deid_map = pd.DataFrame(
+            {"patient_uid": [1, 2, 3], "patient_uid__deid": [10, 20, 30]}
+        )
+
+        with pytest.raises(
+            ValueError, match="Some values in 'patient_id' don't have deid mappings"
+        ):
+            self.transformer._validate_merged_table(merged, df, deid_map)
+
+    def test_validate_merged_table_more_rows_duplicate_deid_map(self):
+        """Test _validate_merged_table raises error for more rows due to duplicate deid_map."""
+        df = pd.DataFrame({"patient_id": [1, 2, 3]})
+        # Merged has 5 rows due to duplicate mappings
+        merged = pd.DataFrame({"patient_id": [1, 1, 2, 2, 3]})
+        # deid_map has duplicate values for patient_uid
+        deid_map = pd.DataFrame(
+            {
+                "patient_uid": [1, 1, 2, 2, 3],  # Duplicates
+                "patient_uid__deid": [10, 10, 20, 20, 30],
+            }
+        )
+
+        with pytest.raises(ValueError, match=r"Merge resulted in.*extra row"):
+            self.transformer._validate_merged_table(merged, df, deid_map)
+
+    def test_validate_merged_table_more_rows_duplicate_dataframe(self):
+        """Test _validate_merged_table raises error for more rows due to duplicate DataFrame values."""
+        # DataFrame has duplicate values
+        df = pd.DataFrame({"patient_id": [1, 1, 2, 2, 3]})
+        # Merged has more rows due to duplicates matching multiple deid_map rows
+        merged = pd.DataFrame({"patient_id": [1, 1, 1, 1, 2, 2, 2, 2, 3]})
+        # deid_map has multiple rows for same values (though this shouldn't happen normally)
+        deid_map = pd.DataFrame(
+            {
+                "patient_uid": [1, 1, 2, 2, 3],
+                "patient_uid__deid": [10, 11, 20, 21, 30],
+            }
+        )
+
+        with pytest.raises(ValueError, match=r"Merge resulted in.*extra row"):
+            self.transformer._validate_merged_table(merged, df, deid_map)
+
+    def test_validate_merged_table_more_rows_unexpected(self):
+        """Test _validate_merged_table raises error for unexpected extra rows."""
+        df = pd.DataFrame({"patient_id": [1, 2, 3]})
+        # Merged has more rows for unknown reason
+        merged = pd.DataFrame({"patient_id": [1, 2, 3, 4, 5]})
+        # deid_map looks normal (no duplicates)
+        deid_map = pd.DataFrame(
+            {"patient_uid": [1, 2, 3], "patient_uid__deid": [10, 20, 30]}
+        )
+
+        with pytest.raises(ValueError, match=r"Merge resulted in.*extra row"):
+            self.transformer._validate_merged_table(merged, df, deid_map)
+
+    def test_validate_fewer_rows_case_type_mismatch(self):
+        """Test _validate_fewer_rows_case with type mismatch."""
+        df = pd.DataFrame({"patient_id": ["1", "2", "3", "4"]})  # String
+        merged = pd.DataFrame({"patient_id": ["1", "2"]})
+        deid_map = pd.DataFrame(
+            {"patient_uid": [1, 2, 3, 4], "patient_uid__deid": [10, 20, 30, 40]}
+        )  # Integer
+
+        with pytest.raises(ValueError) as exc_info:
+            self.transformer._validate_fewer_rows_case(
+                merged, df, deid_map, "patient_id", "patient_uid"
+            )
+
+        error_msg = str(exc_info.value)
+        assert "type mismatch" in error_msg
+        assert "value_cast" in error_msg
+
+    def test_validate_fewer_rows_case_missing_mappings(self):
+        """Test _validate_fewer_rows_case with missing mappings (no type mismatch)."""
+        df = pd.DataFrame({"patient_id": [1, 2, 3, 4, 5]})
+        merged = pd.DataFrame({"patient_id": [1, 2, 3]})
+        deid_map = pd.DataFrame(
+            {"patient_uid": [1, 2, 3], "patient_uid__deid": [10, 20, 30]}
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            self.transformer._validate_fewer_rows_case(
+                merged, df, deid_map, "patient_id", "patient_uid"
+            )
+
+        error_msg = str(exc_info.value)
+        assert "don't have deid mappings" in error_msg
+        assert "type mismatch" not in error_msg.lower()
+
+    def test_validate_more_rows_case_duplicate_deid_map(self):
+        """Test _validate_more_rows_case with duplicate deid_map values."""
+        df = pd.DataFrame({"patient_id": [1, 2, 3]})
+        merged = pd.DataFrame({"patient_id": [1, 1, 2, 2, 3]})
+        deid_map = pd.DataFrame(
+            {
+                "patient_uid": [1, 1, 2, 2, 3],  # Duplicates
+                "patient_uid__deid": [10, 10, 20, 20, 30],
+            }
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            self.transformer._validate_more_rows_case(
+                merged, df, deid_map, "patient_id", "patient_uid"
+            )
+
+        error_msg = str(exc_info.value)
+        assert "duplicate values in the deid_map" in error_msg
+
+    def test_validate_more_rows_case_duplicate_dataframe(self):
+        """Test _validate_more_rows_case with duplicate DataFrame values."""
+        # DataFrame has duplicates, deid_map should NOT have duplicates
+        # to properly test DataFrame duplicate detection
+        # Note: In reality, if deid_map has unique values, merging wouldn't create extra rows
+        # This test simulates a scenario where DataFrame duplicates somehow cause issues
+        df = pd.DataFrame({"patient_id": [1, 1, 2, 2, 3]})  # Duplicates
+        # Simulate merged having extra rows (though this wouldn't happen with unique deid_map)
+        # This tests the DataFrame duplicate detection path
+        merged = pd.DataFrame({"patient_id": [1, 1, 1, 1, 2, 2, 2, 2, 3]})
+        # deid_map has unique values (no duplicates in patient_uid)
+        deid_map = pd.DataFrame(
+            {
+                "patient_uid": [1, 2, 3],  # Unique values
+                "patient_uid__deid": [10, 20, 30],
+            }
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            self.transformer._validate_more_rows_case(
+                merged, df, deid_map, "patient_id", "patient_uid"
+            )
+
+        error_msg = str(exc_info.value)
+        # Since deid_map has no duplicates, it should detect DataFrame duplicates
+        # (or fall through to unexpected extra rows if DataFrame doesn't have duplicates)
+        # The validation checks deid_map first, then DataFrame, then unexpected
+        assert "duplicate values in 'patient_id'" in error_msg
+
+    def test_validate_more_rows_case_unexpected(self):
+        """Test _validate_more_rows_case with unexpected extra rows."""
+        df = pd.DataFrame({"patient_id": [1, 2, 3]})
+        merged = pd.DataFrame({"patient_id": [1, 2, 3, 4, 5]})
+        deid_map = pd.DataFrame(
+            {"patient_uid": [1, 2, 3], "patient_uid__deid": [10, 20, 30]}
+        )
+
+        with pytest.raises(ValueError) as exc_info:
+            self.transformer._validate_more_rows_case(
+                merged, df, deid_map, "patient_id", "patient_uid"
+            )
+
+        error_msg = str(exc_info.value)
+        assert "unexpected" in error_msg.lower()
+
+    def test_validate_merged_table_empty_dataframes(self):
+        """Test _validate_merged_table with empty DataFrames."""
+        df = pd.DataFrame({"patient_id": []})
+        merged = pd.DataFrame({"patient_id": []})
+        deid_map = pd.DataFrame({"patient_uid": [], "patient_uid__deid": []})
+
+        # Should not raise an error
+        self.transformer._validate_merged_table(merged, df, deid_map)
+
+    def test_validate_merged_table_with_nan_values(self):
+        """Test _validate_merged_table handles NaN values correctly."""
+        df = pd.DataFrame({"patient_id": [1, 2, 3, np.nan]})
+        # NaN values are excluded from merge, so merged has fewer rows
+        merged = pd.DataFrame({"patient_id": [1, 2, 3]})
+        deid_map = pd.DataFrame(
+            {"patient_uid": [1, 2, 3], "patient_uid__deid": [10, 20, 30]}
+        )
+
+        # Should raise error because NaN values don't have mappings
+        with pytest.raises(
+            ValueError, match="Some values in 'patient_id' don't have deid mappings"
+        ):
+            self.transformer._validate_merged_table(merged, df, deid_map)
