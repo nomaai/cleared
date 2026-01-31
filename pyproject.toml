@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "cleared"
-version = "0.4.8"
+version = "0.4.10"
 description = "An open-source multi-purpose de-identification library with special support for healthcare applications. Provides robust tools to de-identify multi-table, multimodal datasets while maintaining clinical integrity and research utility."
 authors = ["NOMA AI INC."]
 license = "Apache-2.0 with Commons Clause restriction"

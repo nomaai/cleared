@@ -4,6 +4,24 @@ Changelog
 
 (unreleased)
 ------------
+- Chore: bump version to 0.4.9 (#61) [Salim Malakouti, github-
+  actions[bot], github-actions[bot]]
+
+  * chore: bump version to 0.4.9
+
+  * updated poetry lock
+
+  ---------
+- Fixed logging and error prompt issues (#62) [salimnoma]
+- Implement support for file segments (#60) [salimnoma]
+
+  * Implemented multi-segment file support for table
+
+  * Fixed tests and linting issues
+
+  * Fixed minor issues
+- Chore: bump version to 0.4.8 (#59) [github-actions[bot], github-
+  actions[bot]]
 - Fixed linting and formatting (#58) [salimnoma]
 - Chore: bump version to 0.4.7 (#57) [github-actions[bot], github-
   actions[bot]]
