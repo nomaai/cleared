@@ -4,6 +4,10 @@ Changelog
 
 (unreleased)
 ------------
+- Implemented new error messages to merge failures in IDDeidentifier
+  (#64) [salimnoma]
+- Chore: bump version to 0.4.10 (#63) [github-actions[bot], github-
+  actions[bot]]
 - Chore: bump version to 0.4.9 (#61) [Salim Malakouti, github-
   actions[bot], github-actions[bot]]
 
